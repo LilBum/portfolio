@@ -1,0 +1,260 @@
+export type Accent = 'violet' | 'teal' | 'pink'
+
+export type CodeLang = 'luau' | 'ts' | 'cs' | 'py' | 'py'
+
+export type Snippet = {
+  file: string
+  lang: CodeLang
+  code: string
+}
+
+export type Project = {
+  title: string
+  category: string
+  role: string
+  blurb: string
+  impact: string[]
+  tags: string[]
+  image?: string
+  imageAlt?: string
+  visualLabel?: string
+  /** Syntax-highlighted code window shown in the card media slot (preferred over image). */
+  snippet?: Snippet
+  /** Label for the small mock UI button overlapping the code window. */
+  uiChip?: string
+  href?: string
+  repo?: string
+  /** Internal hash route to a long-form case study page. */
+  caseStudy?: string
+  /** Status line shown when there are no links (overrides the default). */
+  note?: string
+  accent: Accent
+  year?: string
+}
+
+export const projects: Project[] = [
+  {
+    title: 'FSA Debt Consolidation Platform',
+    category: 'Enterprise software',
+    role: 'Full-stack engineer at TSPi',
+    blurb:
+      'Production Angular/AWS work for federally regulated loan systems used by Farm Service Agency staff and applicants.',
+    impact: [
+      'Built forms and pages used daily by 1,500+ users',
+      'Contributed to a debt consolidation system recognized at the congressional level',
+      'Maintained 95-100% unit test coverage across multiple modules',
+    ],
+    tags: ['Angular', 'AWS', 'Node.js', 'Jest'],
+    visualLabel: '1,500+ daily users',
+    snippet: {
+      file: 'loan-form.component.ts',
+      lang: 'ts',
+      code: `readonly loanForm = this.fb.group({
+  principal: [0, Validators.min(1)],
+  termMonths: [12, monthRange(6, 480)],
+})
+
+submit() {
+  if (this.loanForm.invalid) return
+  const dto = this.loanForm.getRawValue()
+  this.api.consolidate(dto)
+    .subscribe(p => this.go('/plan', p.id))
+}`,
+    },
+    uiChip: 'Calculate plan',
+    accent: 'teal',
+    year: '2023-present',
+  },
+  {
+    title: 'Spin a Home',
+    category: 'Roblox game systems',
+    role: 'Gameplay, data, economy, and UI scripting',
+    blurb:
+      'An RNG spin-and-collect Roblox experience about a mischievous genie granting homes of randomized rarity and archetype.',
+    impact: [
+      'Built ProfileStore-backed player data, migration, autosave, and shutdown handling',
+      'Added server-authoritative spin cooldowns, per-minute caps, hard pity, and museum eviction',
+      'Wired spin results into HUD state, reveal animations, and plot display at runtime',
+    ],
+    tags: ['Roblox', 'Luau', 'Rojo', 'ProfileStore'],
+    snippet: {
+      file: 'SpinService.luau',
+      lang: 'luau',
+      code: `function SpinService.RequestSpin(player)
+    local data = Data.Get(player)
+    if not Cooldown.Ready(player) then
+        return Reject.Cooldown(player)
+    end
+    local roll = Rng.WeightedRoll(
+        SpinTable, data.PityCount)
+    Plots.PlaceHome(player, roll.HomeId)
+    Hud.Push(player, "SpinResult", roll)
+end`,
+    },
+    uiChip: 'SPIN',
+    note: 'In development - playable demo coming',
+    accent: 'violet',
+    year: '2026',
+  },
+  {
+    title: 'Detective Tycoon',
+    category: 'Roblox prototype',
+    role: 'Game architecture and puzzle systems',
+    blurb:
+      'A noir tycoon prototype where ascension is earned by solving procedurally generated investigation puzzles.',
+    impact: [
+      'Implemented server-owned hidden solutions so exploit scripts never receive solver-ready data',
+      'Built a brute-force uniqueness solver for 3- and 4-option logic-grid puzzles',
+      'Scoped mobile-first puzzle UI, progression, persistence, economy, and monetization systems',
+    ],
+    tags: ['Roblox', 'Luau', 'Rojo', 'Game Design'],
+    visualLabel: 'Logic-grid case board',
+    snippet: {
+      file: 'CaseService.luau',
+      lang: 'luau',
+      code: `-- solutions never replicate to clients
+local case = CaseGen.Build(rng, difficulty)
+Vault[case.Id] = case.Solution
+Remotes.Board:FireClient(plr, case.Public)
+
+Remotes.Guess.OnServerInvoke = function(p, g)
+    if not RateLimit.Allow(p) then
+        return
+    end
+    return Vault.Check(p, g)
+end`,
+    },
+    uiChip: 'Solve case',
+    note: 'Archived prototype',
+    accent: 'teal',
+    year: '2026',
+  },
+  {
+    title: 'Live-Game Audit & Remediation',
+    category: 'Roblox consulting',
+    role: 'Read-only technical audit, priced fix plan, and first fix pass',
+    blurb:
+      'A full review of a live, monetized Roblox horror experience (client name withheld) covering security, the economy, paid-feature delivery, persistence, and a large legacy layer.',
+    impact: [
+      'Reviewed 296 scripts and traced most live bugs to the seam between modern code and 54 disabled legacy scripts',
+      'Found a token-leaking webhook, an arbitrary item-cloning remote, a repeatable currency farm, and paid features that never delivered',
+      'Phased every fix with effort and price (~$5k-$10k full scope), then shipped the critical security and paid-delivery groups live',
+    ],
+    tags: ['Roblox', 'Security', 'Audit', 'Technical Writing'],
+    visualLabel: '296 scripts audited',
+    snippet: {
+      file: 'GrantItem.server.luau',
+      lang: 'luau',
+      code: `-- hardened remote from the fix pass
+local function onGrant(player, itemId)
+    if not Catalog.Owns(player, itemId) then
+        return Audit.Flag(player, itemId)
+    end
+    if RateLimit.Allow(player, 3) then
+        Inventory.Grant(player, itemId)
+    end
+end
+Remotes.GrantItem.OnServerEvent
+    :Connect(onGrant)`,
+    },
+    uiChip: 'Claim item',
+    caseStudy: '#/case-study/roblox-audit',
+    accent: 'pink',
+    year: '2026',
+  },
+  {
+    title: 'Autonomous Behavioral Tracking System',
+    category: 'Research engineering',
+    role: 'Computer vision and robotics for a neuroscience lab',
+    blurb:
+      'A robotics and computer-vision system for a neuroscience research lab that integrates ANY-maze and OpenCV to autonomously track rodents through behavioral experiments and drive hardware to run tasks in response.',
+    impact: [
+      'Integrated ANY-maze behavioral tracking with OpenCV for autonomous, real-time rodent tracking',
+      'Wrote the Python and C# control scripts that drive the robotics to perform tasks based on tracked movement',
+      'Ran inside live experimental sessions, where a missed detection costs real research time',
+    ],
+    tags: ['Python', 'C#', 'ANY-maze', 'OpenCV'],
+    visualLabel: 'Live rodent tracking',
+    snippet: {
+      file: 'tracker.py',
+      lang: 'py',
+      code: `# track the centroid, drive the rig
+while session.active:
+    frame = camera.read()
+    mask = cv2.inRange(frame, lo, hi)
+    cx, cy = centroid(mask)
+
+    if confidence(mask) > 0.85:
+        robot.steer_toward(cx, cy)
+        anymaze.log("approach", cx, cy)`,
+    },
+    uiChip: 'Begin trial',
+    note: 'Research lab - details confidential',
+    accent: 'pink',
+  },
+  {
+    title: 'Pet-Sim Level-Gen Pipeline',
+    category: 'Roblox tooling',
+    role: 'JSON-to-Luau world pipeline and Studio automation',
+    blurb:
+      'A modular pipeline that turns declarative layout JSON into placed, themed Roblox hub worlds with repeatable, screenshot-driven QA.',
+    impact: [
+      'Built a LevelParser module that instantiates a 197-piece hub from declarative layout JSON',
+      'Drove Roblox Studio through MCP automation for placement, lighting, and screenshot-based QA',
+      'Made layout changes diffable text instead of hand-edits, so world iteration is reviewable and reversible',
+    ],
+    tags: ['Roblox Studio', 'Luau', 'Automation', 'Pipelines'],
+    visualLabel: 'JSON -> placed world',
+    snippet: {
+      file: 'LevelParser.luau',
+      lang: 'luau',
+      code: `for _, node in layout.Nodes do
+    local piece = Kit.Clone(node.PieceId)
+    local cf = Grid.ToWorld(node.Cell)
+    piece:PivotTo(cf)
+    Theme.Apply(piece, layout.Palette)
+    piece.Parent = world[node.Section]
+end
+Lighting.ApplyPreset(layout.Mood)
+Capture.Screenshot("hub-" .. layout.Seed)`,
+    },
+    uiChip: 'Generate hub',
+    note: 'Internal tooling',
+    accent: 'violet',
+    year: '2026',
+  },
+  {
+    title: 'This Website',
+    category: 'Web frontend',
+    role: 'Design system, motion engineering, and content pipeline',
+    blurb:
+      'The site you are reading: a data-driven React portfolio with a token-based design system, scroll-linked SVG motion, and syntax-highlighted code-window cards.',
+    impact: [
+      'Built a scroll-tracking gradient trail with a spring-driven comet head - and debugged a renderer-freezing SVG blur into a layered-stroke glow',
+      'Three-typeface system (Inter, Space Grotesk, JetBrains Mono) with scroll-aware nav, count-up stats, and reveal choreography',
+      'All content lives in typed data files; cards, snippets, and case studies render from them',
+    ],
+    tags: ['React', 'TypeScript', 'Tailwind v4', 'Framer Motion'],
+    visualLabel: 'You are here',
+    snippet: {
+      file: 'ScrollTrail.tsx',
+      lang: 'ts',
+      code: `const { scrollYProgress } = useScroll()
+const spring = useSpring(scrollYProgress, {
+  stiffness: 500,
+  damping: 90,
+})
+
+const place = (v: number) => {
+  const pt = path.getPointAtLength(v * total)
+  headX.set(pt.x)
+  headY.set(pt.y)
+}
+spring.on("change", place)`,
+    },
+    uiChip: 'You are here',
+    note: 'Live - you are browsing it',
+    accent: 'teal',
+    year: '2026',
+  },
+]
