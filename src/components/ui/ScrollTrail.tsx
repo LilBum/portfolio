@@ -51,7 +51,7 @@ export default function ScrollTrail() {
 
   const headX = useMotionValue(0)
   const headY = useMotionValue(0)
-  const headColor = useTransform(progress, [0, 0.5, 1], ['#5eead4', '#a78bfa', '#f5a3d0'])
+  const headColor = useTransform(progress, [0, 0.5, 1], ['#0f766e', '#7c3aed', '#db2777'])
 
   useEffect(() => {
     const el = ref.current

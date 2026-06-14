@@ -31,7 +31,7 @@ export default function Hero() {
         aria-hidden
         className="absolute inset-0 -z-10 bg-[radial-gradient(48rem_30rem_at_78%_18%,color-mix(in_srgb,var(--color-accent)_13%,transparent),transparent_65%),radial-gradient(40rem_26rem_at_8%_82%,color-mix(in_srgb,var(--color-accent-2)_9%,transparent),transparent_62%)]"
       />
-      <div className="absolute inset-x-0 bottom-0 -z-10 h-44 bg-[linear-gradient(0deg,var(--color-bg)_0%,rgba(8,9,13,0)_100%)]" />
+      <div className="absolute inset-x-0 bottom-0 -z-10 h-44 bg-[linear-gradient(0deg,var(--color-bg)_0%,rgba(252,248,244,0)_100%)]" />
 
       <div className="hero-content mx-auto min-w-0 sm:w-full sm:max-w-6xl lg:grid lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-14">
         <div className="min-w-0">
@@ -77,13 +77,13 @@ export default function Hero() {
             file="RewardFlow.luau"
             code={heroSnippet}
             lang="luau"
-            className="relative rotate-[1.2deg] shadow-[0_32px_80px_-28px_rgba(0,0,0,0.9)]"
+            className="relative rotate-[1.2deg] shadow-[0_32px_80px_-30px_rgba(63,42,96,0.28)]"
           />
 
           <motion.div
             animate={{ y: [-7, 7] }}
             transition={{ duration: 4.2, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut' }}
-            className="absolute -right-5 top-10 inline-flex items-center gap-2 rounded-2xl bg-accent px-4 py-2.5 text-sm font-bold text-bg shadow-[0_16px_36px_-12px_rgba(167,139,250,0.8)]"
+            className="absolute -right-5 top-10 inline-flex items-center gap-2 rounded-2xl bg-accent px-4 py-2.5 text-sm font-bold text-bg shadow-[0_16px_36px_-12px_rgba(124,58,237,0.42)]"
           >
             <Sparkles size={15} /> Claim Reward
           </motion.div>
@@ -91,7 +91,7 @@ export default function Hero() {
           <motion.div
             animate={{ y: [6, -6] }}
             transition={{ duration: 5, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut', delay: 0.6 }}
-            className="absolute -left-7 bottom-9 w-44 rounded-2xl border border-border bg-surface/90 p-3.5 shadow-[0_18px_40px_-16px_rgba(0,0,0,0.85)] backdrop-blur"
+            className="absolute -left-7 bottom-9 w-44 rounded-2xl border border-border bg-surface/90 p-3.5 shadow-[0_18px_40px_-16px_rgba(63,42,96,0.20)] backdrop-blur"
           >
             <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
               Daily streak <span className="text-accent-2">7/10</span>

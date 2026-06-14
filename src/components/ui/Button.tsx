@@ -23,7 +23,7 @@ export default function Button({
 
   const styles: Record<NonNullable<Props['variant']>, string> = {
     primary:
-      'bg-accent text-bg shadow-[0_12px_30px_-10px_rgba(167,139,250,0.6)] hover:-translate-y-0.5 hover:shadow-[0_16px_38px_-10px_rgba(167,139,250,0.75)] hover:brightness-110',
+      'bg-accent text-bg shadow-[0_12px_30px_-10px_rgba(124,58,237,0.38)] hover:-translate-y-0.5 hover:shadow-[0_16px_38px_-10px_rgba(124,58,237,0.5)] hover:brightness-110',
     ghost:
       'border border-border bg-surface/60 text-fg backdrop-blur hover:-translate-y-0.5 hover:border-accent/60 hover:text-accent',
   }

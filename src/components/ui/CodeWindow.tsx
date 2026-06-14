@@ -57,7 +57,7 @@ export default function CodeWindow({ file, code, lang, className }: Props) {
   return (
     <div
       className={cn(
-        'min-w-0 max-w-full overflow-hidden rounded-xl border border-border/90 bg-bg/85 text-left shadow-[0_18px_44px_-18px_rgba(0,0,0,0.85)] backdrop-blur',
+        'min-w-0 max-w-full overflow-hidden rounded-xl border border-border/90 bg-bg/85 text-left shadow-[0_18px_44px_-18px_rgba(63,42,96,0.16)] backdrop-blur',
         className,
       )}
     >

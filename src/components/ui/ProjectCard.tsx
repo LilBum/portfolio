@@ -28,16 +28,16 @@ const accentHairline: Record<Project['accent'], string> = {
 }
 
 const accentChip: Record<Project['accent'], string> = {
-  violet: 'bg-accent text-bg shadow-[0_10px_24px_-8px_rgba(167,139,250,0.7)]',
-  teal: 'bg-accent-2 text-bg shadow-[0_10px_24px_-8px_rgba(94,234,212,0.7)]',
-  pink: 'bg-accent-3 text-bg shadow-[0_10px_24px_-8px_rgba(245,163,208,0.7)]',
+  violet: 'bg-accent text-bg shadow-[0_10px_24px_-8px_rgba(124,58,237,0.4)]',
+  teal: 'bg-accent-2 text-bg shadow-[0_10px_24px_-8px_rgba(15,118,110,0.4)]',
+  pink: 'bg-accent-3 text-bg shadow-[0_10px_24px_-8px_rgba(219,39,119,0.4)]',
 }
 
 export default function ProjectCard({ project }: { project: Project }) {
   return (
     <article
       className={cn(
-        'group relative flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-surface/65 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_56px_-28px_rgba(0,0,0,0.85)]',
+        'group relative flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-surface/65 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_56px_-26px_rgba(63,42,96,0.22)]',
         accentBorder[project.accent],
       )}
     >
