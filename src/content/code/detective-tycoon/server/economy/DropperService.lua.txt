@@ -1,0 +1,274 @@
+--!strict
+-- spawns physics drops from tagged droppers; tags owner for the collector
+
+local CollectionService = game:GetService("CollectionService")
+local Debris = game:GetService("Debris")
+local MarketplaceService = game:GetService("MarketplaceService")
+local Players = game:GetService("Players")
+
+local DropVisuals = require(script.Parent.DropVisuals)
+local ProfileManager = require(script.Parent.Parent.profile.ProfileManager)
+
+local DROPPER_TAG = "Dropper"
+local DEFAULT_TIER, DEFAULT_VALUE, DEFAULT_INTERVAL = 1, 1, 1
+
+-- Magnifier gamepass — click range upgrade; ownership cached
+-- TODO LO: real GP ID after dashboard creation
+local MAGNIFIER_GAMEPASS_ID = 0
+local CLICK_RANGE_DEFAULT, CLICK_RANGE_MAGNIFIER = 25, 45
+local CLICK_RANGE_SERVER_SLACK = 8 -- server distance allowance over client range
+
+-- per-tier tuning (interval seconds, base payout)
+local DROPPER_TUNING: { [number]: { interval: number, value: number } } = {
+	[1] = { interval = 1.0, value = 1 },
+	[2] = { interval = 1.2, value = 6 },
+	[3] = { interval = 1.6, value = 28 },
+}
+
+-- HOT TIP — ~5% crits worth 10x
+local HOT_TIP_CHANCE, HOT_TIP_MULTIPLIER = 0.05, 10
+
+-- CHASE DROP — red, auto-destructs, pays 200*tier; per-plot cooldown
+local CHASE_DROP_MIN_INTERVAL = 60
+local CHASE_DROP_CHANCE = 0.025
+local CHASE_DROP_LIFETIME = 6
+local CHASE_DROP_BASE_VALUE = 200
+
+-- flash rate dampener
+local FLASH_RATE_TARGET = 4
+local FLASH_DECAY_INTERVAL = 1
+
+local DropperService = {}
+
+-- Local state
+local CollectorService: any = nil -- lazy-resolved in start()
+local magnifierOwnership: { [number]: boolean } = {}
+local activeLoops: { [Instance]: boolean } = {}
+local lastChaseDropAt: { [string]: number } = {}
+local flashRateThisSecond = 0
+
+local function clickRangeFor(userId: number): number
+	return if magnifierOwnership[userId] then CLICK_RANGE_MAGNIFIER else CLICK_RANGE_DEFAULT
+end
+
+local function refreshMagnifierOwnership(player: Player)
+	if MAGNIFIER_GAMEPASS_ID <= 0 then
+		magnifierOwnership[player.UserId] = false
+		return
+	end
+	local ok, owned = pcall(function()
+		return MarketplaceService:UserOwnsGamePassAsync(player.UserId, MAGNIFIER_GAMEPASS_ID)
+	end)
+	magnifierOwnership[player.UserId] = ok and owned == true
+end
+
+local function getOwningPlot(dropper: Instance): Instance?
+	local node: Instance? = dropper.Parent
+	while node do
+		if node:GetAttribute("OwnerUserId") ~= nil and string.match(node.Name, "^Plot_") then
+			return node
+		end
+		node = node.Parent
+	end
+	return nil
+end
+
+local function spawnDrop(dropper: Instance, plot: Instance, ownerUserId: number)
+	local dropPoint = dropper:FindFirstChild("DropPoint") :: BasePart?
+	if not dropPoint then
+		warn(("[DropperService] %s missing DropPoint"):format(dropper:GetFullName()))
+		return
+	end
+
+	local dropParts = plot:FindFirstChild("DropParts")
+	if not dropParts then
+		dropParts = Instance.new("Folder")
+		dropParts.Name = "DropParts"
+		dropParts.Parent = plot
+	end
+
+	local tier = (dropper:GetAttribute("Tier") or DEFAULT_TIER) :: number
+	local value = (dropper:GetAttribute("Value") or DEFAULT_VALUE) :: number
+
+	-- chase drop first (rarest); wins over hot tip
+	local nowClock = os.clock()
+	local chaseEligible = (nowClock - (lastChaseDropAt[plot.Name] or 0)) >= CHASE_DROP_MIN_INTERVAL
+	local isChaseDrop = chaseEligible and (math.random() < CHASE_DROP_CHANCE)
+	if isChaseDrop then
+		lastChaseDropAt[plot.Name] = nowClock
+		value = CHASE_DROP_BASE_VALUE * tier
+	end
+
+	-- hot tip crit (only if not chase)
+	local isHotTip = (not isChaseDrop) and (math.random() < HOT_TIP_CHANCE)
+	if isHotTip then
+		value *= HOT_TIP_MULTIPLIER
+	end
+
+	local part = Instance.new("Part")
+	part.Name = if isChaseDrop then "ChaseDrop" elseif isHotTip then "HotTipDrop" else "Drop"
+	-- size/color/material/glow + value tag + trail
+	DropVisuals.style(part, tier, value, if isChaseDrop then "chase" elseif isHotTip then "hottip" else "normal")
+	-- slight initial tilt (pitch 12°, roll 8°)
+	part.CFrame = CFrame.new(dropPoint.Position)
+		* CFrame.Angles(math.rad(math.random(-12, 12)), math.rad(math.random(0, 360)), math.rad(math.random(-8, 8)))
+	-- CanCollide=false; collector's Touched still fires on overlap
+	part.CanCollide = false
+	part:SetAttribute("Value", value)
+	part:SetAttribute("OwnerPlotId", plot.Name)
+	part:SetAttribute("OwnerUserId", ownerUserId)
+	part:SetAttribute("HotTip", isHotTip)
+	part:SetAttribute("IsChaseDrop", isChaseDrop)
+	part.Parent = dropParts
+
+	-- chase drops auto-destruct; clear owner attribute on destroy
+	if isChaseDrop then
+		local ownerPlayer = Players:GetPlayerByUserId(ownerUserId)
+		if ownerPlayer then
+			ownerPlayer:SetAttribute("ChaseDropActive", true)
+			part.Destroying:Connect(function()
+				if ownerPlayer.Parent then
+					ownerPlayer:SetAttribute("ChaseDropActive", false)
+				end
+			end)
+		end
+		Debris:AddItem(part, CHASE_DROP_LIFETIME)
+	end
+
+	-- flash the dropper's PointLight; rate-limited
+	local flashLight = dropper:FindFirstChild("DropperFlashLight")
+	if flashLight and flashLight:IsA("PointLight") then
+		flashRateThisSecond += 1
+		local rateScale = math.clamp(FLASH_RATE_TARGET / math.max(flashRateThisSecond, 1), 0.5, 1.0)
+		DropVisuals.flash(flashLight :: PointLight, isHotTip, rateScale)
+	end
+
+	-- click-to-collect; ownership validated like the Touched path
+	local clickDetector = Instance.new("ClickDetector")
+	clickDetector.MaxActivationDistance = clickRangeFor(ownerUserId)
+	clickDetector.Parent = part
+	clickDetector.MouseClick:Connect(function(player)
+		if not part.Parent or part:GetAttribute("Credited") then
+			return -- already collected
+		end
+		if player.UserId ~= ownerUserId then
+			return -- owner only
+		end
+		-- server-side distance check (MaxActivationDistance is client-enforced)
+		local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		if not hrp or not hrp:IsA("BasePart") then
+			return
+		end
+		if ((hrp :: BasePart).Position - part.Position).Magnitude > clickRangeFor(ownerUserId) + CLICK_RANGE_SERVER_SLACK then
+			return
+		end
+		if CollectorService and CollectorService.creditPart then
+			CollectorService.creditPart(player, part, true)
+		end
+	end)
+end
+
+local function startLoop(dropper: Instance)
+	if activeLoops[dropper] then
+		return
+	end
+	activeLoops[dropper] = true
+
+	task.spawn(function()
+		while dropper.Parent and activeLoops[dropper] do
+			task.wait(dropper:GetAttribute("Interval") or DEFAULT_INTERVAL)
+
+			if not (dropper.Parent and activeLoops[dropper]) then
+				break
+			end
+			if not dropper:GetAttribute("Active") then
+				continue
+			end
+
+			local plot = getOwningPlot(dropper)
+			if not plot then
+				continue
+			end
+			local ownerUserId = plot:GetAttribute("OwnerUserId")
+			if ownerUserId == nil or ownerUserId == 0 then
+				continue
+			end
+
+			-- no drops until owner clocks in
+			local ownerPlayer = Players:GetPlayerByUserId(ownerUserId :: number)
+			if ownerPlayer then
+				local profile = ProfileManager.get(ownerPlayer)
+				if profile and not profile.permanent.clockedIn then
+					continue
+				end
+			end
+
+			spawnDrop(dropper, plot, ownerUserId :: number)
+		end
+		activeLoops[dropper] = nil
+	end)
+end
+
+local function stopLoop(dropper: Instance)
+	activeLoops[dropper] = nil
+end
+
+-- apply tuning by tier; idempotent
+local function applyDropperTuning(dropper: Instance)
+	local tier = dropper:GetAttribute("Tier")
+	local config = type(tier) == "number" and DROPPER_TUNING[tier]
+	if not config then
+		return
+	end
+	dropper:SetAttribute("Interval", config.interval)
+	dropper:SetAttribute("Value", config.value)
+end
+
+-- flip cache on mid-session gamepass purchase
+function DropperService.setMagnifierOwnership(userId: number, owned: boolean)
+	magnifierOwnership[userId] = owned == true
+end
+
+function DropperService.start()
+	CollectorService = require(script.Parent.CollectorService)
+
+	-- flash-rate decay loop
+	task.spawn(function()
+		while true do
+			task.wait(FLASH_DECAY_INTERVAL)
+			flashRateThisSecond = 0
+		end
+	end)
+
+	for _, dropper in CollectionService:GetTagged(DROPPER_TAG) do
+		applyDropperTuning(dropper)
+		startLoop(dropper)
+	end
+
+	CollectionService:GetInstanceAddedSignal(DROPPER_TAG):Connect(function(dropper)
+		applyDropperTuning(dropper)
+		startLoop(dropper)
+	end)
+	CollectionService:GetInstanceRemovedSignal(DROPPER_TAG):Connect(stopLoop)
+
+	-- magnifier ownership for present + arriving players
+	for _, player in Players:GetPlayers() do
+		task.spawn(refreshMagnifierOwnership, player)
+	end
+	Players.PlayerAdded:Connect(function(player)
+		task.spawn(refreshMagnifierOwnership, player)
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		magnifierOwnership[player.UserId] = nil
+	end)
+	-- refresh cache on mid-session purchase
+	if MAGNIFIER_GAMEPASS_ID > 0 then
+		MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, gamepassId, wasPurchased)
+			if gamepassId == MAGNIFIER_GAMEPASS_ID and wasPurchased then
+				magnifierOwnership[player.UserId] = true
+			end
+		end)
+	end
+end
+
+return DropperService

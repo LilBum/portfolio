@@ -1,0 +1,385 @@
+-- Server-authoritative pet trading: offer, ready-up, countdown, atomic swap.
+local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
+local TradingRemotes = ReplicatedStorage.Remotes.Trading
+local TradeFunctions = TradingRemotes.Functions -- RemoteFunctions: RequestTrade, StartTrade, ChangeOffer, TradeAction
+local TradeEvents = TradingRemotes.Events -- RemoteEvents: Requested, Started, OfferChanged, Action
+local Modules = ReplicatedStorage.Modules
+local PetMultipliers = require(Modules.PetMultipliers)
+local Multipliers = require(Modules.Multipliers)
+
+local TradeSessions = {} -- [userId] = { id, partnerUserId, tradeTokens, pets }
+
+local CompleteTrade
+
+local function isReady(plr)
+	return plr and plr.Parent and plr:FindFirstChild("Loaded") and plr.Loaded.Value
+end
+
+local function countDictionary(dict)
+	local count = 0
+	for _ in dict do
+		count += 1
+	end
+	return count
+end
+
+local function clearSession(player)
+	local session = TradeSessions[player.UserId]
+	TradeSessions[player.UserId] = nil
+
+	if session then
+		local partner = Players:GetPlayerByUserId(session.partnerUserId)
+		if partner then
+			TradeSessions[partner.UserId] = nil
+		end
+	end
+
+	if player:FindFirstChild("NonSaveValues") then
+		player.NonSaveValues.IsTrading.Value = false
+		player.NonSaveValues.IsReady.Value = false
+	end
+end
+
+local function getSessionPair(player, partnerName)
+	local session = TradeSessions[player.UserId]
+	if not session then
+		return nil, nil
+	end
+
+	local partner = Players:GetPlayerByUserId(session.partnerUserId)
+	if not partner or (partnerName and partner.Name ~= partnerName) then
+		return nil, nil
+	end
+
+	local partnerSession = TradeSessions[partner.UserId]
+	if not partnerSession then
+		return nil, nil
+	end
+	if partnerSession.id ~= session.id or partnerSession.partnerUserId ~= player.UserId then
+		return nil, nil
+	end
+
+	return session, partner
+end
+
+local function sendTradeCancel(player, partner, reason)
+	TradeEvents.Action:FireClient(player, { Option = "Cancel", Reason = reason })
+	TradeEvents.Action:FireClient(partner, { Option = "Cancel", Reason = reason })
+	clearSession(player)
+	clearSession(partner)
+end
+
+TradeFunctions.RequestTrade.OnServerInvoke = function(player, partnerName)
+	local partner = Players:FindFirstChild(tostring(partnerName))
+	if not partner then
+		return "Player not found"
+	end
+	if partner == player then
+		return "Cannot trade yourself"
+	end
+	if not isReady(player) or not isReady(partner) then
+		return "Player has not loaded"
+	end
+	if TradeSessions[player.UserId] or TradeSessions[partner.UserId] then
+		return "Player is in trade"
+	end
+
+	TradeEvents.Requested:FireClient(partner, player.Name)
+	return true
+end
+
+TradeFunctions.StartTrade.OnServerInvoke = function(player, partnerName)
+	local partner = Players:FindFirstChild(tostring(partnerName))
+	if not partner then
+		return false
+	end
+	if partner == player then
+		return false
+	end
+	if not isReady(player) or not isReady(partner) then
+		return false
+	end
+	if TradeSessions[player.UserId] or TradeSessions[partner.UserId] then
+		return false
+	end
+
+	local sessionId = HttpService:GenerateGUID(false)
+	TradeSessions[player.UserId] = {
+		id = sessionId,
+		partnerUserId = partner.UserId,
+		tradeTokens = 0,
+		pets = {},
+	}
+	TradeSessions[partner.UserId] = {
+		id = sessionId,
+		partnerUserId = player.UserId,
+		tradeTokens = 0,
+		pets = {},
+	}
+
+	player.NonSaveValues.IsTrading.Value = true
+	partner.NonSaveValues.IsTrading.Value = true
+	player.NonSaveValues.IsReady.Value = false
+	partner.NonSaveValues.IsReady.Value = false
+
+	TradeEvents.Started:FireClient(partner, player.Name)
+	return true
+end
+
+TradeFunctions.ChangeOffer.OnServerInvoke = function(player, partnerName, args)
+	local session, partner = getSessionPair(player, tostring(partnerName))
+	if not session or not partner then
+		return
+	end
+	if type(args) ~= "table" then
+		return
+	end
+
+	if args.OfferType == "Pet" then
+		local petId = tostring(args.ID)
+		local ownedPet = player.Data.Pets:FindFirstChild(petId)
+		if not ownedPet then
+			return
+		end
+
+		if not session.pets[petId] then
+			local incomingCount = countDictionary(session.pets) + 1
+			local partnerPetCount = #partner.Data.Pets:GetChildren()
+			if partnerPetCount + incomingCount > Multipliers.GetMaxPetsStorage(partner) then
+				return "Max"
+			end
+
+			session.pets[petId] = true
+			TradeEvents.OfferChanged:FireClient(partner, "PetAdded", petId)
+			player.NonSaveValues.IsReady.Value = false
+			partner.NonSaveValues.IsReady.Value = false
+			return "Added"
+		else
+			session.pets[petId] = nil
+			TradeEvents.OfferChanged:FireClient(partner, "PetRemoved", petId)
+			player.NonSaveValues.IsReady.Value = false
+			partner.NonSaveValues.IsReady.Value = false
+			return "Removed"
+		end
+	elseif args.OfferType == "TradeTokens" then
+		local amount = tonumber(args.Amount)
+		if not amount or amount ~= amount or amount < 0 or amount ~= math.floor(amount) or amount == math.huge then
+			return
+		end
+
+		local currency = player.Data.PlayerData:FindFirstChild("Currency2")
+		if not currency or currency.Value < amount then
+			return
+		end
+
+		session.tradeTokens = amount
+		TradeEvents.OfferChanged:FireClient(partner, "TradeTokens", amount)
+		player.NonSaveValues.IsReady.Value = false
+		partner.NonSaveValues.IsReady.Value = false
+	end
+end
+
+TradeFunctions.TradeAction.OnServerInvoke = function(player, partnerName, args)
+	local session, partner = getSessionPair(player, tostring(partnerName))
+	if not session or not partner then
+		return
+	end
+	if type(args) ~= "table" then
+		return
+	end
+
+	if args.Option == "Cancel" then
+		sendTradeCancel(player, partner, "Cancelled")
+		return true
+	elseif args.Option == "Ready" then
+		if not player.NonSaveValues.IsReady.Value then
+			player.NonSaveValues.IsReady.Value = true
+
+			if partner.NonSaveValues.IsReady.Value then
+				local active = true
+				TradeEvents.Action:FireClient(partner, { Option = "Countdown", Count = 3 })
+				TradeEvents.Action:FireClient(player, { Option = "Countdown", Count = 3 })
+
+				local function bothReady()
+					local stillLinked = getSessionPair(player, partner.Name)
+					return stillLinked ~= nil
+						and player.Parent ~= nil
+						and partner.Parent ~= nil
+						and player.NonSaveValues.IsReady.Value
+						and partner.NonSaveValues.IsReady.Value
+				end
+
+				local function cancelCountdown()
+					active = false
+					TradeEvents.Action:FireClient(partner, { Option = "CountdownEnded" })
+					TradeEvents.Action:FireClient(player, { Option = "CountdownEnded" })
+				end
+
+				for _ = 10, 1, -1 do
+					if not bothReady() then
+						cancelCountdown()
+						break
+					end
+					task.wait(0.3)
+				end
+				if not bothReady() then
+					cancelCountdown()
+				end
+				if not active then
+					return
+				end
+
+				if CompleteTrade(player, partner) then
+					TradeEvents.Action:FireClient(partner, { Option = "Countdown", Count = 0 })
+					TradeEvents.Action:FireClient(player, { Option = "Countdown", Count = 0 })
+				end
+			else
+				TradeEvents.Action:FireClient(partner, { Option = "Ready" })
+				return "Ready"
+			end
+		else
+			player.NonSaveValues.IsReady.Value = false
+			TradeEvents.Action:FireClient(partner, { Option = "Unready" })
+			return "Unready"
+		end
+	end
+end
+
+local function UnequipPet(player, pet)
+	if not pet.Equipped.Value then
+		return
+	end
+	pet.Equipped.Value = false
+	PetMultipliers.RemovePet(player.Name, tonumber(pet.Name))
+	player.NonSaveValues.PetsEquipped.Value = PetMultipliers.GetPetsEquipped(player.Name)
+end
+
+local function LoadEquipped(player)
+	local equippedPets = PetMultipliers.Multipliers[player.Name] or {}
+	for petId in equippedPets do
+		if not workspace.PlayerPets[player.Name]:FindFirstChild(tostring(petId)) then
+			local petInstance = player.Data.Pets:FindFirstChild(tostring(petId))
+			if petInstance then
+				local newPet = ReplicatedStorage.Pets[petInstance.PetName.Value]:Clone()
+				newPet.Name = tostring(petId)
+				for _, part in newPet:GetChildren() do
+					if part:IsA("BasePart") then
+						part.Anchored = true
+					end
+				end
+				newPet:PivotTo(player.Character.HumanoidRootPart.CFrame)
+				newPet.Parent = workspace.PlayerPets[player.Name]
+			end
+		end
+	end
+	for _, playerPet in workspace.PlayerPets[player.Name]:GetChildren() do
+		if not equippedPets[tonumber(playerPet.Name)] then
+			playerPet:Destroy()
+		end
+	end
+end
+
+CompleteTrade = function(player, partner)
+	if not player or not player.Parent then
+		return false
+	end
+	if not partner or not partner.Parent then
+		return false
+	end
+
+	local offer1 = TradeSessions[player.UserId]
+	local offer2 = TradeSessions[partner.UserId]
+	if not offer1 or not offer2 or offer1.id ~= offer2.id then
+		return false
+	end
+
+	local function abort(reason)
+		sendTradeCancel(player, partner, reason)
+		return false
+	end
+
+	local cur1 = player.Data.PlayerData:FindFirstChild("Currency2")
+	local cur2 = partner.Data.PlayerData:FindFirstChild("Currency2")
+	if not cur1 or not cur2 then
+		return abort("Currency missing")
+	end
+	if cur1.Value < offer1.tradeTokens or cur2.Value < offer2.tradeTokens then
+		return abort("Insufficient gems")
+	end
+
+	for petId in offer1.pets do
+		if not player.Data.Pets:FindFirstChild(petId) then
+			return abort("Pet missing")
+		end
+	end
+	for petId in offer2.pets do
+		if not partner.Data.Pets:FindFirstChild(petId) then
+			return abort("Pet missing")
+		end
+	end
+
+	local offer1Pets = countDictionary(offer1.pets)
+	local offer2Pets = countDictionary(offer2.pets)
+	local playerFinalPets = #player.Data.Pets:GetChildren() - offer1Pets + offer2Pets
+	local partnerFinalPets = #partner.Data.Pets:GetChildren() - offer2Pets + offer1Pets
+	if
+		playerFinalPets > Multipliers.GetMaxPetsStorage(player)
+		or partnerFinalPets > Multipliers.GetMaxPetsStorage(partner)
+	then
+		return abort("Storage full")
+	end
+
+	player.NonSaveValues.IsTrading.Value = false
+	partner.NonSaveValues.IsTrading.Value = false
+	player.NonSaveValues.IsReady.Value = false
+	partner.NonSaveValues.IsReady.Value = false
+
+	for petId in offer1.pets do
+		local pet = player.Data.Pets:FindFirstChild(petId)
+		if pet then
+			if pet.Equipped.Value then
+				UnequipPet(player, pet)
+			end
+			pet.Parent = partner.Data.Pets
+		end
+	end
+	for petId in offer2.pets do
+		local pet = partner.Data.Pets:FindFirstChild(petId)
+		if pet then
+			if pet.Equipped.Value then
+				UnequipPet(partner, pet)
+			end
+			pet.Parent = player.Data.Pets
+		end
+	end
+
+	cur2.Value += offer1.tradeTokens - offer2.tradeTokens
+	cur1.Value += offer2.tradeTokens - offer1.tradeTokens
+
+	LoadEquipped(player)
+	LoadEquipped(partner)
+
+	TradeSessions[player.UserId] = nil
+	TradeSessions[partner.UserId] = nil
+	return true
+end
+
+-- unstick both sides when a player leaves mid-trade
+Players.PlayerRemoving:Connect(function(leaving)
+	local session = TradeSessions[leaving.UserId]
+	TradeSessions[leaving.UserId] = nil
+	if not session then
+		return
+	end
+
+	local partner = Players:GetPlayerByUserId(session.partnerUserId)
+	if partner then
+		TradeSessions[partner.UserId] = nil
+		partner.NonSaveValues.IsTrading.Value = false
+		partner.NonSaveValues.IsReady.Value = false
+		TradeEvents.Action:FireClient(partner, { Option = "Cancel", Reason = "Partner left" })
+	end
+end)

@@ -1,0 +1,89 @@
+--!strict
+-- Services
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Packages
+local React = require(ReplicatedStorage.Packages.React)
+
+-- Types
+type Props = {
+	amount: number,
+	onDone: () -> (),
+}
+
+-- Constants
+local DURATION = 1.9
+local MILLION = 1_000_000
+local THOUSAND = 1_000
+
+local FLOAT_DISTANCE = 56
+local PILL_BOTTOM_Y = 70
+
+-- fade phases
+local FADE_IN_END = 0.18
+local FADE_OUT_START = 0.58
+local FADE_OUT_SPAN = 0.42
+
+local TEXT_COLOR = Color3.fromRGB(255, 218, 60)
+
+local function fmt(n: number): string
+	if n >= MILLION then
+		return string.format("+%.1fM WB", n / MILLION)
+	end
+	if n >= THOUSAND then
+		return string.format("+%.1fK WB", n / THOUSAND)
+	end
+	return "+" .. tostring(n) .. " WB"
+end
+
+local function WishbuckDelta(props: Props)
+	local anim, setAnim = React.useState({ t = 0 })
+
+	React.useEffect(function()
+		local t = 0
+		local done = false
+		local conn = RunService.Heartbeat:Connect(function(dt)
+			if done then
+				return
+			end
+			t += dt
+			if t >= DURATION then
+				done = true
+				task.defer(props.onDone)
+				return
+			end
+			setAnim({ t = t })
+		end)
+		return function()
+			done = true
+			if conn then
+				conn:Disconnect()
+			end
+		end
+	end, {})
+
+	local progress = anim.t / DURATION
+	local yOffset = -(1 - (1 - progress) ^ 2) * FLOAT_DISTANCE
+	local alpha = if progress < FADE_IN_END
+		then progress / FADE_IN_END
+		elseif progress < FADE_OUT_START then 1
+		else 1 - (progress - FADE_OUT_START) / FADE_OUT_SPAN
+
+	return React.createElement("TextLabel", {
+		AnchorPoint = Vector2.new(0, 0),
+		Position = UDim2.new(0, 14, 0, PILL_BOTTOM_Y + yOffset),
+		Size = UDim2.fromOffset(168, 24),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Text = fmt(props.amount),
+		TextColor3 = TEXT_COLOR,
+		TextTransparency = 1 - alpha,
+		TextScaled = true,
+		Font = Enum.Font.GothamBold,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		ZIndex = 8,
+	})
+end
+
+return WishbuckDelta

@@ -1,0 +1,156 @@
+--!strict
+-- Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Shared modules
+local Shared = ReplicatedStorage.Shared
+local LampConfig = require(Shared.Data.LampConfig)
+local Remotes = require(ReplicatedStorage.Remotes)
+local Types = require(Shared.Types)
+
+-- Server modules
+local PlayerDataService = require(script.Parent.PlayerDataService)
+local NpcService = require(script.Parent.NpcService)
+local WardrobeService = require(script.Parent.WardrobeService)
+local QuestService = require(script.Parent.QuestService)
+local TelemetryService = require(script.Parent.TelemetryService)
+local TelemetryEvents = require(Shared.Data.TelemetryEvents)
+
+-- Types
+type HouseRecord = Types.HouseRecord
+type PlayerData = Types.PlayerData
+
+-- Constants
+local INCOME_PER_SECOND_DIVISOR = 300
+local INCOME_TICK_INTERVAL = 1
+local MAX_LAMP_TIER = #LampConfig
+
+-- Private functions
+
+local function findDisplayHouse(data: PlayerData): HouseRecord?
+	if not data.displayHouseId then
+		return nil
+	end
+	for _, record in data.museum do
+		if record.id == data.displayHouseId then
+			return record
+		end
+	end
+	return nil
+end
+
+local function buildWishbuckPayload(data: PlayerData)
+	local nextTier = data.lampTier + 1
+	local upgradeCost = nextTier <= MAX_LAMP_TIER and LampConfig[nextTier].upgradeCostWishbucks or math.huge
+
+	local incomePerSec = 0
+	local displayHouse = findDisplayHouse(data)
+	if displayHouse then
+		incomePerSec = displayHouse.appraisal
+			/ INCOME_PER_SECOND_DIVISOR
+			* NpcService.getIncomeMult(data)
+			* WardrobeService.getIncomeMult(data)
+	end
+
+	return {
+		wishbucks = data.wishbucks,
+		gems = data.gems or 0,
+		lampTier = data.lampTier,
+		upgradeCost = upgradeCost,
+		incomePerSec = incomePerSec,
+		museumSize = #data.museum,
+		pityCount = data.pityCount or 0,
+	}
+end
+
+local function syncWishbucks(player: Player)
+	local data = PlayerDataService.GetData(player)
+	if data then
+		Remotes.WishbuckSync:FireClient(player, buildWishbuckPayload(data))
+	end
+end
+
+-- lamp upgrade handler
+local function handleLampUpgrade(player: Player): (boolean, string?)
+	local data = PlayerDataService.GetData(player)
+	if not data then
+		return false, "data_not_loaded"
+	end
+
+	local nextTier = data.lampTier + 1
+	if nextTier > MAX_LAMP_TIER then
+		return false, "max_tier"
+	end
+
+	local cost = LampConfig[nextTier].upgradeCostWishbucks
+	if data.wishbucks < cost then
+		return false, "insufficient_wishbucks"
+	end
+
+	data.wishbucks -= cost
+	data.lampTier = nextTier
+
+	TelemetryService.fire(player, TelemetryEvents.LAMP_UPGRADED, {
+		fromTier = nextTier - 1,
+		toTier = nextTier,
+		cost = cost,
+	})
+	TelemetryService.fire(player, TelemetryEvents.SOFT_CURRENCY_SPENT, {
+		amount = cost,
+		sink = "lamp_upgrade",
+	})
+
+	-- resync wishbucks and tokens
+	Remotes.WishbuckSync:FireClient(player, buildWishbuckPayload(data))
+	Remotes.TokenSync:FireClient(player, data.spinTokens)
+
+	return true
+end
+
+-- Connections / public API
+
+-- initial sync on join
+Players.PlayerAdded:Connect(function(player)
+	if PlayerDataService.WaitForProfile(player) then
+		syncWishbucks(player)
+	end
+end)
+
+for _, player in Players:GetPlayers() do
+	task.spawn(syncWishbucks, player)
+end
+
+-- passive income loop
+task.spawn(function()
+	while true do
+		local dt = task.wait(INCOME_TICK_INTERVAL)
+
+		for _, player in Players:GetPlayers() do
+			local data = PlayerDataService.GetData(player)
+			if not data then
+				continue
+			end
+
+			local displayHouse = findDisplayHouse(data)
+			if displayHouse then
+				local incomeMult = NpcService.getIncomeMult(data) * WardrobeService.getIncomeMult(data)
+				local earned = displayHouse.appraisal / INCOME_PER_SECOND_DIVISOR * dt * incomeMult
+				data.wishbucks += earned
+				QuestService.onWishbucksEarned(player, earned)
+			end
+
+			Remotes.WishbuckSync:FireClient(player, buildWishbuckPayload(data))
+		end
+	end
+end)
+
+Remotes.RequestLampUpgrade.OnServerInvoke = handleLampUpgrade
+
+local EconomyService = {}
+
+function EconomyService.syncWishbucks(player: Player)
+	syncWishbucks(player)
+end
+
+return EconomyService

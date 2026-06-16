@@ -1,0 +1,48 @@
+-- Central multiplier + limit math, shared so every system agrees on the numbers.
+-- Reads rebirth, gamepasses, equipped pets, and gem upgrades.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local GameSettings = ReplicatedStorage["Game Settings"]
+local PetMultipliers = require(ReplicatedStorage.Modules.PetMultipliers)
+
+local Multipliers = {}
+
+function Multipliers.RebirthMultiplier(Player)
+	if GameSettings.RebirthType.Value == "Linear" then
+		return Player.Data.PlayerData.Rebirth.Value * GameSettings.RebirthMultiplier.Value + 1
+	end
+	return (GameSettings.RebirthMultiplier.Value + 0.5) ^ Player.Data.PlayerData.Rebirth.Value
+end
+
+function Multipliers.CurrencyMultiplier(Player)
+	local Multi = GameSettings.CurrencyMultiplier.Value
+	Multi *= (Player.Data.Gamepasses.DoubleCurrency.Value and 2 or 1)
+	Multi *= Multipliers.RebirthMultiplier(Player)
+	Multi *= PetMultipliers.ReadPlayerMultiplier(Player.Name)
+
+	local R = ReplicatedStorage.GemShop["2"].Reward
+	Multi *= if R.Exponential.Value
+		then R.DefaultReward.Value + R.IncreasePer.Value ^ Player.Data.PlayerData.GemUpgrade2.Value
+		else R.DefaultReward.Value + R.IncreasePer.Value * Player.Data.PlayerData.GemUpgrade2.Value
+	return Multi
+end
+
+-- equip cap: base 5, raised by the MorePets gamepasses
+function Multipliers.GetMaxPetsEquipped(Player)
+	return 5
+		+ (Player.Data.Gamepasses.MorePets1.Value and 3 or 0)
+		+ (Player.Data.Gamepasses.MorePets2.Value and 10 or 0)
+end
+
+-- storage cap: base 50, raised by the MoreStorage gamepasses
+function Multipliers.GetMaxPetsStorage(Player)
+	return 50
+		+ (Player.Data.Gamepasses.MoreStorage1.Value and 50 or 0)
+		+ (Player.Data.Gamepasses.MoreStorage2.Value and 250 or 0)
+end
+
+function Multipliers.GetLuckMultiplier(Player)
+	return Player.Data.Gamepasses.Lucky.Value and 2 or 1
+end
+
+return Multipliers

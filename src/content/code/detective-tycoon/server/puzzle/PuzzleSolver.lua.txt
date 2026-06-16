@@ -1,0 +1,158 @@
+--!strict
+-- brute-force logic-grid solver (uniqueness)
+
+-- Constants
+local CONSTRAINT_IS = "is"
+local CONSTRAINT_NOT = "not"
+local CONSTRAINT_SAME_OWNER = "sameOwner"
+local CATEGORY_LOCATION = "Location"
+local CATEGORY_EVIDENCE = "Evidence"
+local UNIQUENESS_EARLY_OUT_COUNT = 1
+
+local PuzzleSolver = {}
+
+-- Types
+export type Assignment = { [string]: { [string]: string } }
+
+export type Constraint = {
+	type: string,
+	leftValue: string?,
+	leftCategory: string?,
+	rightCategory: string,
+	rightValue: string,
+}
+
+export type SolverContext = {
+	categories: { [string]: { string } },
+	constraints: { Constraint },
+}
+
+export type Stats = {
+	candidatesChecked: number,
+	maxBranchDepth: number,
+	eliminations: number,
+}
+
+export type SolverResult = {
+	solutionCount: number,
+	firstSolution: Assignment?,
+	stats: Stats,
+}
+
+-- Heap's algorithm
+local function permutations(list: { string }, action: ({ string }) -> ())
+	local n = #list
+	local working = table.clone(list)
+	local function generate(k: number)
+		if k == 1 then
+			action(working)
+			return
+		end
+		generate(k - 1)
+		for i = 1, k - 1 do
+			if k % 2 == 0 then
+				working[i], working[k] = working[k], working[i]
+			else
+				working[1], working[k] = working[k], working[1]
+			end
+			generate(k - 1)
+		end
+	end
+	if n == 0 then
+		return
+	end
+	generate(n)
+end
+
+local function checkConstraint(assignment: Assignment, constraint: Constraint, stats: Stats): boolean
+	if constraint.type == CONSTRAINT_IS then
+		local suspect = constraint.leftValue :: string
+		local attrs = assignment[suspect]
+		if not attrs then
+			return false
+		end
+		return attrs[constraint.rightCategory] == constraint.rightValue
+	elseif constraint.type == CONSTRAINT_NOT then
+		local suspect = constraint.leftValue :: string
+		local attrs = assignment[suspect]
+		if not attrs then
+			return true
+		end
+		return attrs[constraint.rightCategory] ~= constraint.rightValue
+	elseif constraint.type == CONSTRAINT_SAME_OWNER then
+		for _, attrs in assignment do
+			if attrs[constraint.leftCategory :: string] == constraint.leftValue and attrs[constraint.rightCategory] == constraint.rightValue then
+				return true
+			end
+		end
+		stats.eliminations += 1
+		return false
+	end
+	error("unknown constraint type: " .. tostring(constraint.type))
+end
+
+local function checkAll(assignment: Assignment, constraints: { Constraint }, stats: Stats): boolean
+	for _, constraint in constraints do
+		if not checkConstraint(assignment, constraint, stats) then
+			return false
+		end
+	end
+	return true
+end
+
+function PuzzleSolver.countSolutions(ctx: SolverContext): SolverResult
+	local stats: Stats = { candidatesChecked = 0, maxBranchDepth = 0, eliminations = 0 }
+	local solutionCount = 0
+	local firstSolution: Assignment? = nil
+
+	local suspects = ctx.categories.Suspect
+	local locations = ctx.categories.Location
+	local evidence = ctx.categories.Evidence
+	local n = #suspects
+	stats.maxBranchDepth = n
+
+	local locPerms: { { string } } = {}
+	permutations(locations, function(permutation)
+		table.insert(locPerms, table.clone(permutation))
+	end)
+	local evPerms: { { string } } = {}
+	permutations(evidence, function(permutation)
+		table.insert(evPerms, table.clone(permutation))
+	end)
+
+	for _, locPerm in locPerms do
+		for _, evPerm in evPerms do
+			stats.candidatesChecked += 1
+			local assignment: Assignment = {}
+			for i, suspect in suspects do
+				assignment[suspect] = {
+					[CATEGORY_LOCATION] = locPerm[i],
+					[CATEGORY_EVIDENCE] = evPerm[i],
+				}
+			end
+
+			if checkAll(assignment, ctx.constraints, stats) then
+				solutionCount += 1
+				if firstSolution == nil then
+					firstSolution = assignment
+				end
+				-- early-out: only need 1 vs >1
+				if solutionCount > UNIQUENESS_EARLY_OUT_COUNT then
+					return {
+						solutionCount = solutionCount,
+						firstSolution = firstSolution,
+						stats = stats,
+					}
+				end
+			end
+		end
+	end
+
+	return {
+		solutionCount = solutionCount,
+		firstSolution = firstSolution,
+		stats = stats,
+	}
+end
+
+return PuzzleSolver

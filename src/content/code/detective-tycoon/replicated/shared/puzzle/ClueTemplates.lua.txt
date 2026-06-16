@@ -1,0 +1,43 @@
+--!strict
+-- clue templates (client renders by id + slots)
+
+-- Constants
+local SLOT_PATTERN = "{(%w+)}"
+
+-- Types
+export type Slots = { [string]: string }
+
+local ClueTemplates = {}
+
+local TEMPLATES: { [string]: string } = {
+	positive_seen = "{subject} was seen in the {object}.",
+	positive_carried = "{subject} was carrying the {object}.",
+	negative_seen = "{subject} was NOT in the {object}.",
+	negative_carried = "{subject} was NOT carrying the {object}.",
+	same_owner = "The suspect in the {left} had the {right}.",
+}
+
+function ClueTemplates.render(templateId: string, slots: Slots): string
+	local template = TEMPLATES[templateId]
+	if not template then
+		return ("<unknown clue: %s>"):format(templateId)
+	end
+	local result = template:gsub(SLOT_PATTERN, function(key: string): string
+		return slots[key] or ("<" .. key .. ">")
+	end)
+	return result
+end
+
+function ClueTemplates.has(templateId: string): boolean
+	return TEMPLATES[templateId] ~= nil
+end
+
+function ClueTemplates.allTemplateIds(): { string }
+	local ids: { string } = {}
+	for id in TEMPLATES do
+		table.insert(ids, id)
+	end
+	return ids
+end
+
+return ClueTemplates

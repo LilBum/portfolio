@@ -1,0 +1,369 @@
+--!strict
+-- per-player Big Case puzzle state; solution stays server-side
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local PuzzleGen = require(script.Parent.PuzzleGen)
+local PuzzleRemotes =
+	require(ReplicatedStorage:WaitForChild("shared"):WaitForChild("remotes"):WaitForChild("PuzzleRemotes"))
+local ProfileManager = require(script.Parent.Parent.profile.ProfileManager)
+local Telemetry = require(script.Parent.Parent.Telemetry)
+local AscensionService = require(script.Parent.AscensionService)
+local AchievementService = require(script.Parent.Parent.AchievementService)
+local DailyTribuneService = require(script.Parent.Parent.DailyTribuneService)
+local DailyQuestService = require(script.Parent.Parent.DailyQuestService)
+local MatchCaseService = require(script.Parent.Parent.MatchCaseService)
+
+local SUBMIT_COOLDOWN_SECONDS = 10
+local MIN_SOLVE_FLOOR_SECONDS = 1.0 -- anti-bot floor
+local STAR_CASE_CHANCE = 1 / 8 -- 1-in-8, +50% cash
+local STAR_CASE_BONUS_MULTIPLIER = 1.5
+local SOLVED_CASES_CAP = 100
+
+-- recurring mark watermark, banded by ascension level; cosmetic only
+local RECURRING_MARKS = { "♠", "🔑", "⌗", "⚯", "☩" }
+local RECURRING_MARK_BAND_LEVELS = 5
+
+-- wrong-submission flavor (random; never reveals the cell)
+local WRONG_FLAVOR = {
+	"The Captain doesn't buy it.",
+	"Try again, kid — there's a hole in your theory.",
+	"That dog won't hunt.",
+	"Doesn't add up. Check your notes.",
+	"Back to the drawing board.",
+	"The story has gaps you haven't filled.",
+	"Something's off. Read the clues again.",
+	"The DA wouldn't touch this. Try again.",
+	"You're chasing the wrong ghost.",
+	"The pieces don't fit. Look closer.",
+	"Sloppy. Take another pass at it.",
+	"Not it, detective. Keep digging.",
+}
+
+type Solution = { [string]: { [string]: string } }
+
+export type State = {
+	clientPuzzle: any,
+	constraints: { any },
+	hiddenSolution: Solution,
+	caseTitle: string,
+	generatedAt: number,
+	lastSubmitAt: number?,
+	submitting: boolean?, -- re-entry guard against double-ascend race
+	isStarCase: boolean?, -- server-authoritative star marker
+}
+
+export type SubmitResult = {
+	ok: boolean,
+	reason: string?,
+	cooldownRemaining: number?,
+	flavor: string?,
+	correctSuspectCount: number?,
+}
+
+local PuzzleService = {}
+
+local states: { [number]: State } = {}
+
+local function difficultyForLevel(level: number): (number, string)
+	if level <= 1 then
+		return 3, "easy"
+	end
+	return 4, if level <= 4 then "medium" else "hard"
+end
+
+-- count suspect rows matching the hidden solution exactly
+local function countCorrectSuspects(theory: any, solution: Solution): number
+	if type(theory) ~= "table" then
+		return 0
+	end
+	local correct = 0
+	for suspect, expected in solution do
+		local provided = theory[suspect]
+		if
+			type(provided) == "table"
+			and provided.Location == expected.Location
+			and provided.Evidence == expected.Evidence
+		then
+			correct += 1
+		end
+	end
+	return correct
+end
+
+-- server-authoritative validation against hidden solution
+local function validateTheory(theory: any, solution: Solution): boolean
+	if type(theory) ~= "table" then
+		return false
+	end
+	-- reject extra suspects, then require every solution row to match
+	for suspect in theory do
+		if solution[suspect] == nil then
+			return false
+		end
+	end
+	local total = 0
+	for _ in solution do
+		total += 1
+	end
+	return countCorrectSuspects(theory, solution) == total
+end
+
+function PuzzleService.requestPuzzle(player: Player): any?
+	local profile = ProfileManager.get(player)
+	if not profile then
+		return nil
+	end
+	if profile.currentRun.cash < AscensionService.thresholdFor(profile.permanent.ascensionLevel) then
+		return nil -- threshold not met
+	end
+
+	local existing = states[player.UserId]
+	if existing then
+		return existing.clientPuzzle
+	end
+
+	local optionCount, difficulty = difficultyForLevel(profile.permanent.ascensionLevel)
+	local generated = PuzzleGen.generate({ optionCount = optionCount, difficulty = difficulty })
+	local puzzle = generated.clientPuzzle
+
+	-- tutorial flag: first puzzle only
+	if not profile.permanent.firstPuzzleCompleted then
+		puzzle.tutorial = true
+	end
+
+	-- informant pre-revealed clue (consume flag)
+	if player:GetAttribute("PreRevealedCluePending") == true then
+		local suspects = {}
+		for suspect in generated.hiddenSolution do
+			table.insert(suspects, suspect)
+		end
+		if #suspects > 0 then
+			local picked = suspects[math.random(1, #suspects)]
+			local field = if math.random() < 0.5 then "Location" else "Evidence"
+			puzzle.preRevealedClue =
+				{ suspect = picked, field = field, value = generated.hiddenSolution[picked][field] }
+		end
+		player:SetAttribute("PreRevealedCluePending", false)
+	end
+
+	-- star case roll; bonus enforced server-side at submit
+	local isStarCase = math.random() < STAR_CASE_CHANCE
+	if isStarCase then
+		puzzle.isStarCase = true
+		puzzle.starBonusMultiplier = STAR_CASE_BONUS_MULTIPLIER
+	end
+
+	-- recurring mark for this ascension band
+	local bandIndex = math.floor(profile.permanent.ascensionLevel / RECURRING_MARK_BAND_LEVELS)
+	puzzle.recurringMark = RECURRING_MARKS[(bandIndex % #RECURRING_MARKS) + 1]
+
+	states[player.UserId] = {
+		clientPuzzle = puzzle,
+		constraints = generated.constraints,
+		hiddenSolution = generated.hiddenSolution,
+		caseTitle = puzzle.title or "Untitled Case",
+		generatedAt = os.clock(),
+		lastSubmitAt = nil,
+		submitting = false,
+		isStarCase = isStarCase,
+	}
+
+	-- funnel step 5 — BigCaseOpened
+	pcall(function()
+		Telemetry.funnelStep(player, 5, "BigCaseOpened", {
+			ascensionLevel = profile.permanent.ascensionLevel,
+			caseTitle = puzzle.title,
+			isStarCase = isStarCase,
+		})
+	end)
+
+	if isStarCase then
+		PuzzleRemotes.StarCaseTriggered:FireClient(
+			player,
+			{ isStar = true, bonusMultiplier = STAR_CASE_BONUS_MULTIPLIER }
+		)
+	end
+
+	return puzzle
+end
+
+function PuzzleService.submitTheory(player: Player, theory: any): SubmitResult
+	local state = states[player.UserId]
+	if not state then
+		return { ok = false, reason = "no_active_puzzle" }
+	end
+
+	-- re-entry guard
+	if state.submitting then
+		return { ok = false, reason = "submitting" }
+	end
+	state.submitting = true
+
+	local now = os.clock()
+	if state.lastSubmitAt then
+		local cooldownRemaining = SUBMIT_COOLDOWN_SECONDS - (now - state.lastSubmitAt)
+		if cooldownRemaining > 0 then
+			state.submitting = false
+			return { ok = false, reason = "cooldown", cooldownRemaining = cooldownRemaining }
+		end
+	end
+	state.lastSubmitAt = now
+
+	-- anti-bot floor; don't reveal why
+	local solveSeconds = now - state.generatedAt
+	if solveSeconds < MIN_SOLVE_FLOOR_SECONDS then
+		state.submitting = false
+		return { ok = false, reason = "too_fast", cooldownRemaining = MIN_SOLVE_FLOOR_SECONDS - solveSeconds }
+	end
+
+	local profile = ProfileManager.get(player)
+	if not profile then
+		state.submitting = false
+		return { ok = false, reason = "no_profile" }
+	end
+
+	Telemetry.fire("AscensionAttempted", { playerId = player.UserId, level = profile.permanent.ascensionLevel })
+
+	-- funnel step 6 — TheorySubmitted
+	pcall(function()
+		Telemetry.funnelStep(player, 6, "TheorySubmitted", {
+			ascensionLevel = profile.permanent.ascensionLevel,
+			solveTimeSeconds = math.floor(solveSeconds),
+		})
+	end)
+
+	if not validateTheory(theory, state.hiddenSolution) then
+		-- warmer/colder: count correct rows, don't reveal which
+		state.submitting = false
+		return {
+			ok = false,
+			reason = "incorrect",
+			flavor = WRONG_FLAVOR[math.random(1, #WRONG_FLAVOR)],
+			correctSuspectCount = countCorrectSuspects(theory, state.hiddenSolution),
+		}
+	end
+
+	-- correct — record, reward, hand off to ascend
+	local ok, result = xpcall(function(): SubmitResult
+		local solveTimeSeconds = math.floor(solveSeconds)
+		Telemetry.fire("AscensionSucceeded", {
+			playerId = player.UserId,
+			level = profile.permanent.ascensionLevel,
+			solveTimeSeconds = solveTimeSeconds,
+		})
+		profile.permanent.firstPuzzleCompleted = true
+
+		-- best solve time per case title
+		if type(profile.permanent.bestSolveTimes) ~= "table" then
+			profile.permanent.bestSolveTimes = {}
+		end
+		local prior = profile.permanent.bestSolveTimes[state.caseTitle]
+		if type(prior) ~= "number" or solveTimeSeconds < prior then
+			profile.permanent.bestSolveTimes[state.caseTitle] = solveTimeSeconds
+		end
+
+		-- the ledger — append, FIFO cap
+		if type(profile.permanent.solvedCases) ~= "table" then
+			profile.permanent.solvedCases = {}
+		end
+		table.insert(profile.permanent.solvedCases, {
+			caseTitle = state.caseTitle,
+			solveTimeSeconds = solveTimeSeconds,
+			ascensionLevel = profile.permanent.ascensionLevel + 1,
+			stampedAt = os.time(),
+			weather = workspace:GetAttribute("SessionWeather") :: string?,
+			wasStar = state.isStarCase == true,
+		})
+		while #profile.permanent.solvedCases > SOLVED_CASES_CAP do
+			table.remove(profile.permanent.solvedCases, 1)
+		end
+		player:SetAttribute("SolvedCount", #profile.permanent.solvedCases)
+
+		-- cash bonuses — server-authoritative, before ascend zeroes run cash
+		local function awardCash(bonus: number)
+			if bonus > 0 then
+				ProfileManager.set(player, "currentRun.cash", profile.currentRun.cash + bonus)
+			end
+		end
+		local threshold = AscensionService.thresholdFor(profile.permanent.ascensionLevel)
+		if state.isStarCase then -- +50% of threshold
+			awardCash(math.floor(threshold * (STAR_CASE_BONUS_MULTIPLIER - 1)))
+		end
+		if MatchCaseService.consumeBonusOnSolve(player) then -- stacks with star
+			awardCash(threshold)
+		end
+
+		-- live solve feed
+		PuzzleRemotes.SolveFeed:FireAllClients({
+			playerName = player.Name,
+			caseTitle = state.caseTitle,
+			solveTimeSeconds = solveTimeSeconds,
+			level = profile.permanent.ascensionLevel + 1,
+			isStarCase = state.isStarCase == true,
+		})
+
+		-- daily tribune cross-server top-12 (after local broadcast)
+		pcall(function()
+			DailyTribuneService.submitSolve(player, solveSeconds, profile.permanent.ascensionLevel + 1)
+		end)
+
+		-- daily quests
+		pcall(function()
+			DailyQuestService.tick(player, "solve_puzzles", 1)
+		end)
+
+		AscensionService.ascend(player)
+		AchievementService.onAscend(player, solveTimeSeconds) -- after ascend
+
+		return { ok = true }
+	end, debug.traceback)
+
+	state.submitting = false
+	if not ok then
+		warn(("[PuzzleService] submit success flow failed for %d: %s"):format(player.UserId, tostring(result)))
+		return { ok = false, reason = "server_error" }
+	end
+	return result
+end
+
+function PuzzleService.clearPuzzle(player: Player)
+	states[player.UserId] = nil
+end
+
+function PuzzleService.onPlayerRemoving(player: Player)
+	if states[player.UserId] then
+		local profile = ProfileManager.get(player)
+		Telemetry.fire("PuzzleAbandoned", {
+			playerId = player.UserId,
+			level = if profile then profile.permanent.ascensionLevel else -1,
+		})
+		states[player.UserId] = nil
+	end
+end
+
+function PuzzleService.start()
+	PuzzleRemotes.RequestBigCase.OnServerInvoke = function(player: Player)
+		return PuzzleService.requestPuzzle(player)
+	end
+	PuzzleRemotes.SubmitTheory.OnServerInvoke = function(player: Player, theory: any)
+		return PuzzleService.submitTheory(player, theory)
+	end
+	Players.PlayerRemoving:Connect(PuzzleService.onPlayerRemoving)
+end
+
+-- test-only escape hatches
+function PuzzleService._getHiddenSolutionForTesting(player: Player): Solution?
+	local state = states[player.UserId]
+	return state and state.hiddenSolution or nil
+end
+
+function PuzzleService._setLastSubmitForTesting(player: Player, lastSubmitAt: number?)
+	local state = states[player.UserId]
+	if state then
+		state.lastSubmitAt = lastSubmitAt
+	end
+end
+
+return PuzzleService

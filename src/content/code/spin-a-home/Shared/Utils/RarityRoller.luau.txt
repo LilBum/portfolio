@@ -1,0 +1,115 @@
+--!strict
+-- lamp tier -> rolled rarity
+
+local RarityConfig = require(script.Parent.Parent.Data.RarityConfig)
+
+-- Constants
+local DEFAULT_RARITY: Rarity = "Common"
+local NO_TIER = 0
+
+export type Rarity = "Common" | "Uncommon" | "Rare" | "Epic" | "Legendary" | "Mythic" | "Secret"
+
+export type PoolEntry = { rarity: string, cumulative: number }
+
+-- tier values, low to high
+local RARITY_TIER: { [string]: number } = {
+	Common = 1,
+	Uncommon = 2,
+	Rare = 3,
+	Epic = 4,
+	Legendary = 5,
+	Mythic = 6,
+	Secret = 7,
+}
+
+-- per-module RNG
+local rng = Random.new()
+
+-- build cumulative weight pool
+local function buildPool(lampTier: number): { PoolEntry }
+	local filtered: { { rarity: string, weight: number } } = {}
+	local totalFiltered = 0
+
+	for _, rarityName in RarityConfig.RARITY_ORDER do
+		local data = RarityConfig.Config[rarityName]
+		if data.lampRequired <= lampTier then
+			table.insert(filtered, { rarity = rarityName, weight = data.weight })
+			totalFiltered += data.weight
+		end
+	end
+
+	local pool: { PoolEntry } = {}
+	local running = 0
+	for _, entry in filtered do
+		local scaled = math.round((entry.weight / totalFiltered) * RarityConfig.TOTAL_WEIGHT)
+		running += scaled
+		table.insert(pool, { rarity = entry.rarity, cumulative = running })
+	end
+	-- clamp rounding drift
+	pool[#pool].cumulative = RarityConfig.TOTAL_WEIGHT
+
+	return pool
+end
+
+local function roll(lampTier: number): Rarity
+	local pool = buildPool(lampTier)
+	local r = rng:NextInteger(1, RarityConfig.TOTAL_WEIGHT)
+	for _, entry in pool do
+		if r <= entry.cumulative then
+			return entry.rarity :: Rarity
+		end
+	end
+	return DEFAULT_RARITY
+end
+
+-- pool gated to tier >= minTier
+local function buildPoolAtLeast(lampTier: number, minTier: number): { PoolEntry }
+	local filtered: { { rarity: string, weight: number } } = {}
+	local totalFiltered = 0
+
+	for _, rarityName in RarityConfig.RARITY_ORDER do
+		local data = RarityConfig.Config[rarityName]
+		local tier = RARITY_TIER[rarityName] or NO_TIER
+		if data.lampRequired <= lampTier and tier >= minTier then
+			table.insert(filtered, { rarity = rarityName, weight = data.weight })
+			totalFiltered += data.weight
+		end
+	end
+
+	if totalFiltered == 0 then
+		return {}
+	end
+
+	local pool: { PoolEntry } = {}
+	local running = 0
+	for _, entry in filtered do
+		local scaled = math.round((entry.weight / totalFiltered) * RarityConfig.TOTAL_WEIGHT)
+		running += scaled
+		table.insert(pool, { rarity = entry.rarity, cumulative = running })
+	end
+	pool[#pool].cumulative = RarityConfig.TOTAL_WEIGHT
+	return pool
+end
+
+-- forced roll for hard pity
+local function forceMinRank(lampTier: number, minTier: number): Rarity
+	local pool = buildPoolAtLeast(lampTier, minTier)
+	if #pool == 0 then
+		return roll(lampTier)
+	end
+	local r = rng:NextInteger(1, RarityConfig.TOTAL_WEIGHT)
+	for _, entry in pool do
+		if r <= entry.cumulative then
+			return entry.rarity :: Rarity
+		end
+	end
+	return pool[#pool].rarity :: Rarity
+end
+
+return {
+	roll = roll,
+	forceMinRank = forceMinRank,
+	buildPool = buildPool,
+	buildPoolAtLeast = buildPoolAtLeast,
+	RARITY_TIER = RARITY_TIER,
+}

@@ -1,0 +1,40 @@
+--!strict
+-- appraisal = base by rarity x location mult x variance
+
+local RarityConfig = require(script.Parent.Parent.Data.RarityConfig)
+local LocationConfig = require(script.Parent.Parent.Data.LocationConfig)
+
+-- Types
+type AppraisalRange = { min: number, max: number }
+
+-- Constants
+local DEFAULT_LOCATION_MULTIPLIER = 1.0
+local VARIANCE = 0.15 -- +-15%
+
+-- base ranges per rarity
+local BASE_RANGE: { [string]: AppraisalRange } = {
+	Common = { min = 100, max = 1_000 },
+	Uncommon = { min = 1_000, max = 10_000 },
+	Rare = { min = 10_000, max = 250_000 },
+	Epic = { min = 250_000, max = 10_000_000 },
+	Legendary = { min = 10_000_000, max = 1_000_000_000 },
+	Mythic = { min = 1_000_000_000, max = 100_000_000_000 },
+	Secret = { min = 100_000_000_000, max = 10_000_000_000_000 },
+}
+
+-- per-module RNG
+local rng = Random.new()
+
+local function compute(rarity: string, locationIndex: number): number
+	local range = BASE_RANGE[rarity]
+	assert(range, "[AppraisalCalc] Unknown rarity: " .. tostring(rarity))
+
+	local locData = LocationConfig[locationIndex]
+	local locMult = locData and locData.appraisalMultiplier or DEFAULT_LOCATION_MULTIPLIER
+	local base = math.floor(range.min + rng:NextNumber() * (range.max - range.min))
+	local variance = 1 + (rng:NextNumber() * VARIANCE * 2 - VARIANCE)
+
+	return math.floor(base * locMult * variance)
+end
+
+return { compute = compute }
