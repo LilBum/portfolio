@@ -1,0 +1,66 @@
+"""VWAP-pullback signal engine.
+
+Long (CALL) when price is in an uptrend (above a rising VWAP, fast EMA over
+slow EMA on the 5m), pulls back to touch VWAP, then reclaims it with momentum.
+Mirror image for short (PUT). Everything else is NONE.
+
+Trimmed: ATR/higher-timeframe/sentiment filters and the full reject-reason
+plumbing are elided to keep the setup logic readable.
+"""
+import pandas as pd
+
+from ..indicators import compute_ema, compute_vwap, resample_5m, vwap_slope
+from ..models import SignalDecision
+from ..regime import count_vwap_crosses, time_filter_allows
+
+
+class VwapPullbackSignalEngine:
+    def __init__(self, strategy_cfg: dict) -> None:
+        self.cfg = strategy_cfg
+
+    def evaluate(self, symbol: str, df_1m: pd.DataFrame) -> SignalDecision:
+        reject_reasons: list[str] = []
+
+        vwap = compute_vwap(df_1m)
+        close = df_1m["Close"]
+        close_last = close.iloc[-1]
+        vwap_last = vwap.iloc[-1]
+        slope = vwap_slope(vwap, self.cfg["vwap_slope_lookback"])
+
+        # 5m EMA trend filter
+        bars_5m = resample_5m(df_1m)
+        ema_fast = compute_ema(bars_5m["Close"], self.cfg["ema_fast"]).iloc[-1]
+        ema_slow = compute_ema(bars_5m["Close"], self.cfg["ema_slow"]).iloc[-1]
+
+        # Chop guard: too many VWAP crosses recently => no clean trend
+        crosses = count_vwap_crosses(close, vwap, self.cfg["chop_lookback_minutes"])
+        if self.cfg.get("max_vwap_crosses") and crosses >= self.cfg["max_vwap_crosses"]:
+            reject_reasons.append("Chop regime detected")
+
+        # Did price pull back to VWAP within the lookback window?
+        n = self.cfg["pullback_lookback"] + 1
+        tol = close_last * (self.cfg["pullback_vwap_tolerance_pct"] / 100.0)
+        had_pullback = bool(((close.tail(n) - vwap.tail(n)).abs() <= tol).any())
+        prev_close = close.iloc[-2]
+        momentum_up = (close_last - prev_close) / prev_close * 100.0
+        momentum_down = (prev_close - close_last) / prev_close * 100.0
+
+        is_uptrend = close_last > vwap_last and slope > 0 and ema_fast > ema_slow
+        is_downtrend = close_last < vwap_last and slope < 0 and ema_fast < ema_slow
+
+        direction = "NONE"
+        if is_uptrend and had_pullback and momentum_up >= self.cfg["momentum_min_pct"]:
+            direction = "CALL"
+        elif is_downtrend and had_pullback and momentum_down >= self.cfg["momentum_min_pct"]:
+            direction = "PUT"
+        else:
+            reject_reasons.append("No valid setup conditions")
+
+        return SignalDecision(
+            symbol=symbol,
+            direction=direction,
+            setup="VWAP Trend Pullback",
+            entry_trigger="Reclaim VWAP with momentum in trend",
+            invalidation="1m close back across VWAP or break of pullback structure",
+            reject_reasons=reject_reasons,
+        )

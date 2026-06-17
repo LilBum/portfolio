@@ -1,6 +1,6 @@
 export type Accent = 'violet' | 'teal' | 'pink'
 
-export type CodeLang = 'luau' | 'ts' | 'cs' | 'py' | 'py'
+export type CodeLang = 'luau' | 'ts' | 'cs' | 'py'
 
 export type Snippet = {
   file: string
@@ -36,6 +36,98 @@ export type Project = {
 
 export const projects: Project[] = [
   {
+    title: 'Pose Estimation with DeepLabCut',
+    category: 'Deep learning / computer vision',
+    role: 'Trained pose-estimation model for a research lab',
+    blurb:
+      'A DeepLabCut pose-estimation model (ResNet-50, PyTorch) trained to track a subject\'s body keypoints frame-by-frame from session video - the perception front-end for the real-time tracker.',
+    impact: [
+      'Labeled a 6-keypoint skeleton on ~250 k-means-sampled frames and trained a ResNet-50 pose network in DeepLabCut (PyTorch backend)',
+      'Ran inference (analyze_videos) to produce per-frame keypoints and likelihoods as CSV, gated by a confidence cutoff',
+      'Reduced each frame to a confidence-weighted body centroid so a few occluded joints never poison the downstream track',
+    ],
+    tags: ['Python', 'DeepLabCut', 'PyTorch', 'ResNet-50', 'Pose Estimation'],
+    visualLabel: '6-keypoint pose model',
+    snippet: {
+      file: 'pose.py',
+      lang: 'py',
+      code: `# trained DeepLabCut model -> per-frame keypoints -> centroid
+deeplabcut.analyze_videos(cfg, [video], shuffle=1, save_as_csv=True)
+
+pose = read_pose_csv(out_csv)            # x, y, likelihood per keypoint
+good = [(x, y) for x, y, p in pose[frame] if p >= 0.6]
+cx, cy = centroid(good)                  # confident keypoints only
+return Detection(cx, cy)`,
+    },
+    uiChip: 'Track pose',
+    note: 'Research lab - details anonymized',
+    codeSlug: 'pose-estimation',
+    accent: 'violet',
+  },
+  {
+    title: 'Real-Time Tracking & Robot Control',
+    category: 'Computer vision / robotics',
+    role: 'Real-time tracking and closed-loop robot control for a research lab',
+    blurb:
+      'A real-time computer-vision system that detects and tracks two moving objects on live video with Kalman filtering and occlusion handling, then autonomously steers a robot in response to their positions.',
+    impact: [
+      'Built an OpenCV detection pipeline (LAB/HSV color segmentation, morphology, contour centroids) on a threaded 30 FPS capture loop that never tracks a stale frame',
+      'Wrote per-object constant-velocity Kalman filters with gated association and occlusion handling, so identity survives missed detections and crossings',
+      'Closed the loop onto a mobile robot over a hardware interface, integrated with a Bonsai / ANY-maze pipeline; ran live where a missed detection costs research time',
+    ],
+    tags: ['Python', 'OpenCV', 'Kalman Filters', 'Robotics', 'Bonsai'],
+    visualLabel: 'Live two-object tracking',
+    snippet: {
+      file: 'tracker.py',
+      lang: 'py',
+      code: `# per-object Kalman predict, then gate + update or coast through occlusion
+target.predict(dt); robot.predict(dt)
+
+occluded = near(target.pos, robot.pos) and n_detections < 2
+if not occluded:
+    if gate(target, target_det): target.update(target_det)
+    if gate(robot,  robot_det):  robot.update(robot_det)
+
+steer_robot(target.pos, robot.pos)`,
+    },
+    uiChip: 'Begin trial',
+    note: 'Research lab - details anonymized',
+    codeSlug: 'behavioral-tracking',
+    accent: 'pink',
+  },
+  {
+    title: 'Algorithmic Trading System',
+    category: 'Quantitative trading / automation',
+    role: 'Signal engines, risk engine, execution, and backtesting',
+    blurb:
+      'An automated intraday options trading system: pluggable signal engines (VWAP-pullback, opening-range breakout, mean-reversion) feed a multi-layer risk engine and broker-agnostic execution, all measured with a walk-forward backtester.',
+    impact: [
+      'Built pluggable signal engines over intraday bars and options chains - VWAP-pullback trend entries gated by EMA, VWAP-slope, momentum, and time-of-day/chop filters',
+      'Engineered a multi-layer risk engine: ATR/premium position sizing, volatility-adjusted risk, daily-loss lockouts, post-loss cooldowns, throttles, duplicate-order guards, and a kill switch',
+      'Wired broker-agnostic execution (Webull/IBKR/Tradier/paper) with bracket orders, event journaling, and reconciliation; validated with a walk-forward backtester (Sharpe, drawdown, profit factor)',
+    ],
+    tags: ['Python', 'Options', 'Backtesting', 'Risk Engine'],
+    snippet: {
+      file: 'risk.py',
+      lang: 'py',
+      code: `# size by risk budget, then cap by premium and hard limits
+risk_per_contract = option_mid * 100 * premium_stop_pct
+contracts = floor(account_equity * risk_pct / risk_per_contract)
+contracts = min(contracts, max_by_premium, max_contracts)
+
+if contracts <= 0:
+    return reject("risk_budget_too_small")
+if realized_pnl <= -max_daily_loss:
+    return reject("daily_loss_lockout")
+submit_bracket(order, contracts)`,
+    },
+    uiChip: 'Place order',
+    note: 'Personal project - walkthrough available on request',
+    codeSlug: 'autonomous-trading',
+    accent: 'teal',
+    year: '2026',
+  },
+  {
     title: 'FSA Debt Consolidation Platform',
     category: 'Enterprise software',
     role: 'Full-stack engineer at TSPi',
@@ -43,7 +135,7 @@ export const projects: Project[] = [
       'Production Angular/AWS work for federally regulated loan systems used by Farm Service Agency staff and applicants.',
     impact: [
       'Built forms and pages used daily by 1,500+ users',
-      'Contributed to a debt consolidation system recognized at the congressional level',
+      'Contributed to a debt-consolidation system presented to senior FSA and congressional stakeholders',
       'Maintained 95-100% unit test coverage across multiple modules',
     ],
     tags: ['Angular', 'AWS', 'Node.js', 'Jest'],
@@ -64,78 +156,12 @@ submit() {
 }`,
     },
     uiChip: 'Calculate plan',
-    accent: 'teal',
+    accent: 'violet',
     year: '2023-present',
   },
   {
-    title: 'Spin a Home',
-    category: 'Roblox game systems',
-    role: 'Gameplay, data, economy, and UI scripting',
-    blurb:
-      'An RNG spin-and-collect Roblox experience about a mischievous genie granting homes of randomized rarity and archetype.',
-    impact: [
-      'Built ProfileStore-backed player data, migration, autosave, and shutdown handling',
-      'Added server-authoritative spin cooldowns, per-minute caps, hard pity, and museum eviction',
-      'Wired spin results into HUD state, reveal animations, and plot display at runtime',
-    ],
-    tags: ['Roblox', 'Luau', 'Rojo', 'ProfileStore'],
-    snippet: {
-      file: 'SpinService.luau',
-      lang: 'luau',
-      code: `function SpinService.RequestSpin(player)
-    local data = Data.Get(player)
-    if not Cooldown.Ready(player) then
-        return Reject.Cooldown(player)
-    end
-    local roll = Rng.WeightedRoll(
-        SpinTable, data.PityCount)
-    Plots.PlaceHome(player, roll.HomeId)
-    Hud.Push(player, "SpinResult", roll)
-end`,
-    },
-    uiChip: 'SPIN',
-    note: 'In development - playable demo coming',
-    codeSlug: 'spin-a-home',
-    accent: 'violet',
-    year: '2026',
-  },
-  {
-    title: 'Detective Tycoon',
-    category: 'Roblox prototype',
-    role: 'Game architecture and puzzle systems',
-    blurb:
-      'A noir tycoon prototype where ascension is earned by solving procedurally generated investigation puzzles.',
-    impact: [
-      'Implemented server-owned hidden solutions so exploit scripts never receive solver-ready data',
-      'Built a brute-force uniqueness solver for 3- and 4-option logic-grid puzzles',
-      'Scoped mobile-first puzzle UI, progression, persistence, economy, and monetization systems',
-    ],
-    tags: ['Roblox', 'Luau', 'Rojo', 'Game Design'],
-    visualLabel: 'Logic-grid case board',
-    snippet: {
-      file: 'CaseService.luau',
-      lang: 'luau',
-      code: `-- solutions never replicate to clients
-local case = CaseGen.Build(rng, difficulty)
-Vault[case.Id] = case.Solution
-Remotes.Board:FireClient(plr, case.Public)
-
-Remotes.Guess.OnServerInvoke = function(p, g)
-    if not RateLimit.Allow(p) then
-        return
-    end
-    return Vault.Check(p, g)
-end`,
-    },
-    uiChip: 'Solve case',
-    note: 'Archived prototype',
-    codeSlug: 'detective-tycoon',
-    accent: 'teal',
-    year: '2026',
-  },
-  {
     title: 'Live-Game Audit & Remediation',
-    category: 'Roblox consulting',
+    category: 'Security consulting',
     role: 'Read-only technical audit, priced fix plan, and first fix pass',
     blurb:
       'A full review of a live, monetized Roblox horror experience (client name withheld) covering security, the economy, paid-feature delivery, persistence, and a large legacy layer.',
@@ -144,7 +170,7 @@ end`,
       'Found a token-leaking webhook, an arbitrary item-cloning remote, a repeatable currency farm, and paid features that never delivered',
       'Phased every fix with effort and price (~$5k-$10k full scope), then shipped the critical security and paid-delivery groups live',
     ],
-    tags: ['Roblox', 'Security', 'Audit', 'Technical Writing'],
+    tags: ['Security', 'Audit', 'Static Analysis', 'Technical Writing'],
     visualLabel: '296 scripts audited',
     snippet: {
       file: 'GrantItem.server.luau',
@@ -167,72 +193,6 @@ Remotes.GrantItem.OnServerEvent
     year: '2026',
   },
   {
-    title: 'Autonomous Behavioral Tracking System',
-    category: 'Research engineering',
-    role: 'Computer vision and robotics for a neuroscience lab',
-    blurb:
-      'A robotics and computer-vision system for a neuroscience research lab that integrates ANY-maze and OpenCV to autonomously track rodents through behavioral experiments and drive hardware to run tasks in response.',
-    impact: [
-      'Integrated ANY-maze behavioral tracking with OpenCV for autonomous, real-time rodent tracking',
-      'Wrote the Python and C# control scripts that drive the robotics to perform tasks based on tracked movement',
-      'Ran inside live experimental sessions, where a missed detection costs real research time',
-    ],
-    tags: ['Python', 'C#', 'ANY-maze', 'OpenCV'],
-    visualLabel: 'Live rodent tracking',
-    snippet: {
-      file: 'tracker.py',
-      lang: 'py',
-      code: `# track the centroid, drive the rig
-while session.active:
-    frame = camera.read()
-    mask = cv2.inRange(frame, lo, hi)
-    cx, cy = centroid(mask)
-
-    if confidence(mask) > 0.85:
-        robot.steer_toward(cx, cy)
-        anymaze.log("approach", cx, cy)`,
-    },
-    uiChip: 'Begin trial',
-    note: 'Research lab - details confidential',
-    accent: 'pink',
-  },
-  {
-    title: 'Pet Simulator',
-    category: 'Roblox game systems',
-    role: 'Trading, shop, inventory, and economy systems + anti-exploit hardening',
-    blurb:
-      'A live pet-simulator economy where I built and hardened the server-authoritative systems - pet trading, the egg/gem/area shop, inventory, and global leaderboards.',
-    impact: [
-      'Hardened the trade system against currency dupes, arbitrary pet-ID injection, and mid-trade leave/desync, with full re-validation at commit time',
-      'Built server-validated shop flows - egg gacha with luck-scaled weighted rolls, gem upgrades, and area unlocks - gated on cost, storage caps, and zone',
-      'Implemented pet inventory (equip/unequip/delete, gamepass-aware caps) and OrderedDataStore top-100 leaderboards with log-scale stat encoding',
-    ],
-    tags: ['Roblox', 'Luau', 'Anti-exploit', 'Economy'],
-    snippet: {
-      file: 'ShopHandler.luau',
-      lang: 'luau',
-      code: `Remotes.Egg.OnServerInvoke = function(plr, egg, amount)
-    if amount ~= 1 and amount ~= 3 then return "bad_amount" end
-    if #plr.Data.Pets:GetChildren() + amount
-        > Multipliers.GetMaxPetsStorage(plr) then
-        return "storage_full"
-    end
-    local info = ReplicatedStorage.Eggs:FindFirstChild(egg)
-    if not info then return "no_egg" end
-    if plr.Data.PlayerData.Currency.Value
-        < info.Cost.Value * amount then
-        return "no_currency"
-    end
-    -- deduct, then weighted luck-scaled roll
-end`,
-    },
-    uiChip: 'Open egg',
-    note: 'Live game - systems and hardening',
-    codeSlug: 'pet-sim',
-    accent: 'violet',
-    year: '2026',
-  },
-  {
     title: 'This Website',
     category: 'Web frontend',
     role: 'Design system, motion engineering, and content pipeline',
@@ -241,7 +201,7 @@ end`,
     impact: [
       'Built a scroll-tracking gradient trail with a spring-driven comet head - and debugged a renderer-freezing SVG blur into a layered-stroke glow',
       'Three-typeface system (Inter, Space Grotesk, JetBrains Mono) with scroll-aware nav, count-up stats, and reveal choreography',
-      'All content lives in typed data files; cards, snippets, and case studies render from them',
+      'All content lives in typed data files; cards, snippets, and source explorers render from them',
     ],
     tags: ['React', 'TypeScript', 'Tailwind v4', 'Framer Motion'],
     visualLabel: 'You are here',

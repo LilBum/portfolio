@@ -2,40 +2,27 @@ export type SkillGroup = { label: string; items: string[] }
 
 export const skillGroups: SkillGroup[] = [
   {
-    label: 'Frontend',
+    label: 'Backend & Cloud',
+    items: ['Python', 'Java', 'C#', 'Node.js', 'AWS Lambda', 'S3', 'API Gateway', 'Flask', 'SQL'],
+  },
+  {
+    label: 'Frontend & Web',
     items: ['Angular', 'React', 'TypeScript', 'JavaScript', 'Tailwind CSS', 'Vite'],
   },
   {
-    label: 'Backend & Cloud',
-    items: ['AWS Lambda', 'S3', 'API Gateway', 'Node.js', 'Java/Spring', 'Python/Flask', 'SQL'],
+    label: 'Computer Vision & Robotics',
+    items: ['OpenCV', 'Kalman Filtering', 'Real-Time Tracking', 'Object Detection', 'Serial / Hardware Control'],
   },
   {
-    label: 'Roblox Development',
-    items: [
-      'Luau',
-      'Roblox Studio',
-      'Rojo',
-      'Wally',
-      'ProfileStore',
-      'DataStores',
-      'Economy Systems',
-      'Remote Security',
-      'HUD/UI Systems',
-    ],
+    label: 'ML & Data',
+    items: ['NumPy', 'pandas', 'scikit-learn', 'PyTorch', 'TensorFlow', 'DeepLabCut'],
   },
   {
-    label: 'Engineering',
-    items: [
-      'Jest',
-      'CI/CD',
-      'System Migration',
-      'Security Auditing',
-      'Performance',
-      'Telemetry',
-      'Computer Vision',
-      'OpenCV',
-      'C#',
-      'Technical Writing',
-    ],
+    label: 'AI Tooling',
+    items: ['Claude API', 'OpenAI', 'Prompt Engineering', 'LLM Integration'],
+  },
+  {
+    label: 'Engineering & Game Systems',
+    items: ['Jest', 'CI/CD', 'Security Auditing', 'Luau', 'Anti-Exploit', 'Economy Systems'],
   },
 ]

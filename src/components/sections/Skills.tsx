@@ -8,11 +8,11 @@ export default function Skills() {
       <div className="mx-auto max-w-6xl">
         <SectionHeading
           eyebrow="Toolbox"
-          title="Practical skills across app and game work"
-          description="The stack I use most often for production web software, Roblox systems, and audit-driven fixes."
+          title="The stack, end to end"
+          description="Full-stack web is my day-to-day; the rest is what I reach for in computer-vision, trading, and game-systems side projects."
         />
 
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {skillGroups.map((group, i) => (
             <Reveal
               key={group.label}

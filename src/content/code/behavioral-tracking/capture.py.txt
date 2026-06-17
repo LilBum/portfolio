@@ -1,0 +1,98 @@
+"""Threaded webcam grabber with latest-frame semantics.
+
+cv2.VideoCapture.read() blocks until a fresh frame arrives. If the processing
+thread reads directly, any slow iteration lets old frames back up in the OS
+buffer - by the time we read the next one, we're tracking the past.
+
+Fix: a dedicated thread reads as fast as the camera delivers and overwrites a
+single "latest" slot. The processing thread asks for the latest frame and never
+blocks, never gets a stale one.
+"""
+import sys
+import threading
+import time
+from dataclasses import dataclass
+from typing import Optional
+
+import cv2 as cv
+import numpy as np
+
+
+@dataclass
+class Frame:
+    image: np.ndarray
+    timestamp: float       # time.monotonic() when cap.read() returned
+    frame_idx: int         # monotonically increasing
+
+
+def _select_backend() -> int:
+    """Pick the right cv2 backend for this OS (DirectShow honors BUFFERSIZE=1 on Windows)."""
+    if sys.platform.startswith("win"):
+        return cv.CAP_DSHOW
+    if sys.platform.startswith("linux"):
+        return cv.CAP_V4L2
+    return cv.CAP_ANY
+
+
+class FrameGrabber:
+    def __init__(self, camera_index: int, width: int, height: int, fps: int, fourcc: str = "MJPG"):
+        self._index = camera_index
+        self._width, self._height, self._fps, self._fourcc = width, height, fps, fourcc
+        self._cap: Optional[cv.VideoCapture] = None
+        self._latest: Optional[Frame] = None
+        self._latest_lock = threading.Lock()
+        self._thread: Optional[threading.Thread] = None
+        self._stop_evt = threading.Event()
+        self._frame_count = 0
+
+    def open(self) -> None:
+        cap = cv.VideoCapture(self._index, _select_backend())
+        if not cap.isOpened():
+            raise RuntimeError(f"Could not open camera index {self._index}")
+        # Order matters on some backends: fourcc before resolution.
+        cap.set(cv.CAP_PROP_FOURCC, cv.VideoWriter_fourcc(*self._fourcc))
+        cap.set(cv.CAP_PROP_FRAME_WIDTH, self._width)
+        cap.set(cv.CAP_PROP_FRAME_HEIGHT, self._height)
+        cap.set(cv.CAP_PROP_FPS, self._fps)
+        cap.set(cv.CAP_PROP_BUFFERSIZE, 1)
+        for _ in range(3):       # warm up: some webcams emit junk at start
+            cap.read()
+        self._cap = cap
+
+    def start(self) -> None:
+        if self._cap is None:
+            raise RuntimeError("Call open() before start()")
+        self._stop_evt.clear()
+        self._thread = threading.Thread(target=self._run, name="FrameGrabber", daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop_evt.set()
+        if self._thread is not None:
+            self._thread.join(timeout=2.0)
+        if self._cap is not None:
+            self._cap.release()
+
+    def __enter__(self):
+        self.open()
+        self.start()
+        return self
+
+    def __exit__(self, *args):
+        self.stop()
+
+    def get_latest(self) -> Optional[Frame]:
+        """Most recent frame, or None. Thread-safe and non-blocking."""
+        with self._latest_lock:
+            return self._latest
+
+    def _run(self) -> None:
+        while not self._stop_evt.is_set():
+            ok, img = self._cap.read()
+            now = time.monotonic()
+            if not ok or img is None:
+                time.sleep(0.005)        # transient read failure; retry
+                continue
+            self._frame_count += 1
+            with self._latest_lock:
+                self._latest = Frame(image=img, timestamp=now, frame_idx=self._frame_count)

@@ -10,7 +10,7 @@ export default function Projects() {
         <SectionHeading
           eyebrow="Selected work"
           title="Projects with real systems behind them"
-          description="A mix of professional software delivery, Roblox systems and UI scripting, pipeline tooling, and technical audit work."
+          description="Production full-stack delivery, real-time computer vision and robotics, an algorithmic trading engine, and security-focused audit work."
         />
 
         <div className="grid gap-6 lg:grid-cols-2">

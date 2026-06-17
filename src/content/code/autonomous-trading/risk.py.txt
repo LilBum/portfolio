@@ -1,0 +1,95 @@
+"""Position sizing + the risk controls every order must clear before execution."""
+import math
+from datetime import datetime, timezone
+
+
+def calculate_position_size(
+    account_equity: float,
+    risk_pct: float,
+    option_mid: float,
+    premium_stop_pct: float,
+    max_premium_per_trade: float,
+    max_contracts: int,
+) -> dict:
+    """Contracts = risk budget / risk-per-contract, capped by premium and a hard limit."""
+    if option_mid <= 0:
+        return {"contracts": 0, "reason": "Option mid must be positive"}
+
+    # Risk per contract = how much we lose if the premium stop is hit.
+    risk_per_contract = option_mid * 100.0 * premium_stop_pct
+    premium_per_contract = option_mid * 100.0
+
+    base = math.floor((account_equity * risk_pct) / risk_per_contract)
+    if base <= 0:
+        return {"contracts": 0, "reason": "Risk budget too small"}
+
+    max_by_premium = math.floor(max_premium_per_trade / premium_per_contract)
+    contracts = min(base, max_by_premium, max_contracts)
+    if contracts <= 0:
+        return {"contracts": 0, "reason": "Position capped to zero"}
+
+    return {
+        "contracts": contracts,
+        "estimated_risk": contracts * risk_per_contract,
+        "estimated_premium": contracts * premium_per_contract,
+        "reason": None,
+    }
+
+
+class RiskEngine:
+    """Sizes a position, then runs it through a stack of hard controls.
+
+    Any failed control appends a reject reason; a plan ships only if the list
+    is empty. Controls below are the gist - throttles, duplicate-order
+    detection, and per-symbol caps are elided here.
+    """
+
+    def assess(self, symbol, option, decision_time_utc, direction, config) -> "RiskDecision":
+        reject: list[str] = []
+        controls = config.get("risk_controls", {})
+        account = config.get("account", {})
+
+        # 1) Global kill switch and data-health gate.
+        if controls.get("kill_switch", False):
+            reject.append("Kill switch active")
+        if controls.get("block_on_data_error") and not config["runtime"].get("data_health_ok", True):
+            reject.append("Data provider unhealthy")
+
+        # 2) Size the position by risk budget.
+        sizing = calculate_position_size(
+            account.get("equity", 0.0),
+            account.get("risk_pct", 0.0),
+            option.mid,
+            config["position_sizing"].get("premium_stop_pct", 0.25),
+            config["position_sizing"].get("max_premium_per_trade", account.get("equity", 0.0)),
+            config["position_sizing"].get("max_contracts", 0),
+        )
+        if sizing["contracts"] <= 0:
+            reject.append(sizing["reason"])
+
+        # 3) Daily loss lockout - stop trading once the day's loss budget is spent.
+        max_loss_pct = account.get("max_daily_loss_pct")
+        realized = config["runtime"]["daily_state"].get("realized_pnl", 0.0)
+        if max_loss_pct is not None and realized <= -(account.get("equity", 0.0) * max_loss_pct):
+            reject.append("Daily loss limit reached")
+
+        # 4) Post-loss cooldown - no new entries for N minutes after a loss.
+        self._apply_cooldown(decision_time_utc, reject, config)
+
+        allowed = len(reject) == 0
+        return RiskDecision(
+            allowed=allowed,
+            contracts=sizing["contracts"] if allowed else 0,
+            estimated_risk=sizing.get("estimated_risk", 0.0) if allowed else 0.0,
+            reject_reasons=reject,
+        )
+
+    def _apply_cooldown(self, decision_time_utc, reject, config) -> None:
+        minutes = config.get("account", {}).get("cooldown_minutes_after_loss")
+        last_loss = config["runtime"]["daily_state"].get("last_loss_time_utc")
+        if not minutes or not last_loss:
+            return
+        loss_dt = datetime.fromisoformat(last_loss).astimezone(timezone.utc)
+        now = datetime.fromisoformat(decision_time_utc).astimezone(timezone.utc)
+        if (now - loss_dt).total_seconds() < minutes * 60.0:
+            reject.append("Cooldown after loss active")

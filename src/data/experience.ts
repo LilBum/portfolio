@@ -14,9 +14,9 @@ export const experience: Experience[] = [
     dates: 'Nov 2023 - Present',
     bullets: [
       'Built Angular-based forms and pages used daily by 1,500+ Farm Service Agency loan officers and applicants.',
-      'Developed and maintained a nationwide debt consolidation system recognized at the congressional level.',
+      'Developed features for a nationwide debt-consolidation system presented to senior FSA and congressional stakeholders.',
       'Built an AWS, Angular, and Node.js financial calculator that reduced manual calculation time by roughly 40%.',
-      'Migrated a 10+ year-old Java Struts application to Spring MVC/Boot and Hibernate while maintaining 10,000+ unit tests.',
+      'Modernized legacy Java/Struts workflows into Angular/Spring Boot features while maintaining extensive Jest coverage across critical front-end components.',
     ],
   },
   {
@@ -35,7 +35,7 @@ export const experience: Experience[] = [
 
 export const impactStats = [
   { value: '1,500+', label: 'daily users served', detail: 'FSA loan officers and applicants' },
-  { value: '95-100%', label: 'test coverage', detail: 'Jest coverage across production modules' },
-  { value: '10,000+', label: 'tests preserved', detail: 'during a legacy Java migration' },
-  { value: '296', label: 'Roblox scripts audited', detail: 'for Horror Elevator remediation' },
+  { value: '95-100%', label: 'test coverage', detail: 'Jest coverage on critical front-end components' },
+  { value: '~40%', label: 'manual work cut', detail: 'AWS + Angular financial calculator' },
+  { value: '296', label: 'scripts audited', detail: 'live-game security remediation' },
 ]

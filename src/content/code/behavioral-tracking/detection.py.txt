@@ -1,0 +1,122 @@
+"""Per-frame blob detection for two objects.
+
+  1. A COLOR MARKER (e.g. on the robot): its color is sampled at calibration,
+     then thresholded in LAB color space. LAB separates a saturated color from a
+     light background more robustly than HSV under uneven lighting.
+
+  2. A DARK OBJECT on a light background: thresholded on the V (value) channel of
+     HSV below a chosen level.
+
+The detector is stateless: frame + params in, a single best Detection (or None)
+out. Identity / tracking / occlusion live in tracker.py.
+"""
+from dataclasses import dataclass
+from typing import List, Optional, Tuple
+
+import cv2 as cv
+import numpy as np
+
+
+@dataclass
+class Detection:
+    x: float            # centroid x (pixels)
+    y: float            # centroid y (pixels)
+    area: float         # contour area (pixels^2)
+    contour: np.ndarray
+
+
+@dataclass
+class ColorMarkerParams:
+    target_lab: np.ndarray   # (3,) LAB color sampled at calibration
+    color_range: int         # +/- around target in each LAB channel
+    min_area: int
+    max_area: int
+
+
+@dataclass
+class DarkObjectParams:
+    v_threshold: int         # pixels with V <= this are "dark"
+    min_area: int
+    max_area: int
+
+
+def _kernel(size: int) -> np.ndarray:
+    return cv.getStructuringElement(cv.MORPH_ELLIPSE, (max(1, int(size)),) * 2)
+
+
+def _denoise_mask(mask: np.ndarray, open_size: int = 3, close_size: int = 15) -> np.ndarray:
+    """Open (kill speckle) then close (fill holes)."""
+    m = cv.morphologyEx(mask, cv.MORPH_OPEN, _kernel(open_size))
+    return cv.morphologyEx(m, cv.MORPH_CLOSE, _kernel(close_size))
+
+
+def _largest_contour_in_range(mask, min_area: int, max_area: int) -> Optional[np.ndarray]:
+    cnts, _ = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_NONE)
+    best, best_area = None, -1.0
+    for c in cnts:
+        a = cv.contourArea(c)
+        if min_area <= a <= max_area and a > best_area:
+            best, best_area = c, a
+    return best
+
+
+def _centroid(contour) -> Tuple[float, float]:
+    """Centroid via image moments; fall back to bounding-circle center if degenerate."""
+    M = cv.moments(contour)
+    if M["m00"] > 1e-6:
+        return M["m10"] / M["m00"], M["m01"] / M["m00"]
+    (cx, cy), _ = cv.minEnclosingCircle(contour)
+    return float(cx), float(cy)
+
+
+def polygon_to_mask(polygon: List[Tuple[int, int]], frame_size: Tuple[int, int]) -> np.ndarray:
+    """Rasterize a polygon to a binary mask (255 inside, 0 outside, full-on if < 3 pts)."""
+    h, w = frame_size
+    mask = np.zeros((h, w), dtype=np.uint8)
+    if len(polygon) < 3:
+        mask[:] = 255
+        return mask
+    cv.fillPoly(mask, [np.array(polygon, dtype=np.int32).reshape(-1, 1, 2)], 255)
+    return mask
+
+
+def detect_color_marker(frame_bgr, params: ColorMarkerParams,
+                        roi_mask: Optional[np.ndarray] = None) -> Optional[Detection]:
+    """Largest blob within color range of the calibrated marker, or None."""
+    img = frame_bgr if roi_mask is None else cv.bitwise_and(frame_bgr, frame_bgr, mask=roi_mask)
+    lab = cv.cvtColor(img, cv.COLOR_BGR2LAB)
+    t = params.target_lab.astype(np.float32)
+    r = float(params.color_range)
+    lo = np.clip(t - r, 0, 255).astype(np.uint8)
+    hi = np.clip(t + r, 0, 255).astype(np.uint8)
+    mask = _denoise_mask(cv.inRange(lab, lo, hi))
+    cnt = _largest_contour_in_range(mask, params.min_area, params.max_area)
+    if cnt is None:
+        return None
+    cx, cy = _centroid(cnt)
+    return Detection(cx, cy, float(cv.contourArea(cnt)), cnt)
+
+
+def detect_dark_object(frame_bgr, params: DarkObjectParams,
+                       roi_mask: Optional[np.ndarray] = None,
+                       exclude_circles: Optional[List[Tuple[float, float, float]]] = None) -> Optional[Detection]:
+    """Largest dark blob on a light background, or None.
+
+    exclude_circles zeroes out (x, y, radius) disks before contour-finding - used
+    to cut the robot's own body out so it isn't mistaken for the dark object.
+    """
+    img = frame_bgr if roi_mask is None else cv.bitwise_and(frame_bgr, frame_bgr, mask=roi_mask)
+    v = cv.cvtColor(img, cv.COLOR_BGR2HSV)[:, :, 2]
+    dark = (v <= params.v_threshold).astype(np.uint8) * 255
+    if roi_mask is not None:
+        # Outside-ROI pixels are black -> also "dark"; re-mask so only in-ROI qualifies.
+        dark = cv.bitwise_and(dark, roi_mask)
+    for (ex, ey, er) in (exclude_circles or []):
+        if er > 0:
+            cv.circle(dark, (int(round(ex)), int(round(ey))), int(round(er)), 0, -1)
+    dark = _denoise_mask(dark, open_size=3, close_size=11)
+    cnt = _largest_contour_in_range(dark, params.min_area, params.max_area)
+    if cnt is None:
+        return None
+    cx, cy = _centroid(cnt)
+    return Detection(cx, cy, float(cv.contourArea(cnt)), cnt)

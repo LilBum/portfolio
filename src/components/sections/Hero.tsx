@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { ArrowDown, Mail, Sparkles } from 'lucide-react'
+import { ArrowDown, FileText, Mail, Sparkles } from 'lucide-react'
 import { site } from '../../data/site'
 import Button from '../ui/Button'
 import CodeWindow from '../ui/CodeWindow'
@@ -8,21 +8,19 @@ import { LinkedInIcon } from '../ui/Icons'
 const iconLink =
   'inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-surface/60 text-muted backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/60 hover:text-fg'
 
-const heroSnippet = `-- server validates, client celebrates
-Remotes.ClaimReward.OnServerInvoke = function(player)
-    local reward = Rewards.Roll(player)
-    if not reward then
-        return Reject(player)
-    end
-    Inventory.Grant(player, reward)
-    return reward
-end
+const heroSnippet = `# size by risk budget, then cap by premium and hard limits
+risk_per_contract = option_mid * 100 * premium_stop_pct
+contracts = floor(account_equity * risk_pct / risk_per_contract)
+contracts = min(contracts, max_by_premium, max_contracts)
 
-Hud.OnClaim(function(reward)
-    Sfx.Play("RewardPop")
-    Tween.Pop(ClaimButton, { Scale = 1.08 })
-    Toast.Show(reward.Amount, reward.Name)
-end)`
+if contracts <= 0:
+    return reject("risk_budget_too_small")
+if realized_pnl <= -max_daily_loss:
+    return reject("daily_loss_lockout")
+if open_positions >= max_open:
+    return reject("max_open_positions")
+
+submit_bracket(order, contracts)`
 
 export default function Hero() {
   return (
@@ -40,7 +38,7 @@ export default function Hero() {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-2 opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-accent-2" />
             </span>
-            Available for full-stack and Roblox systems work
+            Available for full-stack engineering roles
           </p>
 
           <h1 className="max-w-4xl text-balance font-display text-5xl font-bold leading-[1.04] tracking-tight text-fg sm:text-7xl lg:text-6xl xl:text-7xl">
@@ -58,6 +56,9 @@ export default function Hero() {
             <Button href="#projects" className="col-span-2 sm:col-span-1">
               View work <ArrowDown size={16} />
             </Button>
+            <Button href={site.resumeUrl} variant="ghost" external>
+              <FileText size={16} /> Resume
+            </Button>
             <Button href={`mailto:${site.email}`} variant="ghost">
               <Mail size={16} /> Email
             </Button>
@@ -74,9 +75,9 @@ export default function Hero() {
           <div className="absolute -inset-10 rounded-full bg-[radial-gradient(closest-side,color-mix(in_srgb,var(--color-accent)_12%,transparent),transparent)]" />
 
           <CodeWindow
-            file="RewardFlow.luau"
+            file="risk.py"
             code={heroSnippet}
-            lang="luau"
+            lang="py"
             className="relative rotate-[1.2deg] shadow-[0_32px_80px_-30px_rgba(63,42,96,0.28)]"
           />
 
@@ -85,7 +86,7 @@ export default function Hero() {
             transition={{ duration: 4.2, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut' }}
             className="absolute -right-5 top-10 inline-flex items-center gap-2 rounded-2xl bg-accent px-4 py-2.5 text-sm font-bold text-bg shadow-[0_16px_36px_-12px_rgba(124,58,237,0.42)]"
           >
-            <Sparkles size={15} /> Claim Reward
+            <Sparkles size={15} /> Order ready
           </motion.div>
 
           <motion.div
@@ -94,10 +95,10 @@ export default function Hero() {
             className="absolute -left-7 bottom-9 w-44 rounded-2xl border border-border bg-surface/90 p-3.5 shadow-[0_18px_40px_-16px_rgba(63,42,96,0.20)] backdrop-blur"
           >
             <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
-              Daily streak <span className="text-accent-2">7/10</span>
+              Risk budget <span className="text-accent-2">60%</span>
             </div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-bg/80">
-              <div className="h-full w-[70%] rounded-full bg-gradient-to-r from-accent-2 to-accent" />
+              <div className="h-full w-[60%] rounded-full bg-gradient-to-r from-accent-2 to-accent" />
             </div>
           </motion.div>
         </div>

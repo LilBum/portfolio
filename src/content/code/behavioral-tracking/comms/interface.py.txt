@@ -1,0 +1,32 @@
+"""Abstract robot interface. The rest of the codebase talks to this only, so the
+underlying robot library can be swapped (real hardware, a mock, a different robot)
+without touching detection, tracking, or controller code.
+"""
+from abc import ABC, abstractmethod
+
+
+class RobotInterface(ABC):
+
+    @abstractmethod
+    def connect(self) -> None:
+        """Establish connection. Blocks until connected or raises."""
+
+    @abstractmethod
+    def disconnect(self) -> None:
+        """Close connection cleanly."""
+
+    @abstractmethod
+    def set_heading(self, heading_deg: int) -> None:
+        """Set desired heading in the IMU frame, 0-359 degrees."""
+
+    @abstractmethod
+    def set_speed(self, speed: int) -> None:
+        """Set forward speed, 0-255."""
+
+    @abstractmethod
+    def stop(self) -> None:
+        """Stop motion immediately."""
+
+    @abstractmethod
+    def reset_aim(self) -> None:
+        """Reset the IMU heading reference so current orientation = 0 degrees."""

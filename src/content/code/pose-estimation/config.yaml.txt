@@ -1,0 +1,39 @@
+# DeepLabCut project config (project_path, video paths, and study fields trimmed)
+Task: PoseEstimation
+scorer: alex
+date: Aug9
+multianimalproject: false
+
+# Default engine for shuffle creation (pytorch or tensorflow)
+engine: pytorch
+
+# Keypoints labeled on each frame
+bodyparts:
+  - nose
+  - left_ear
+  - right_ear
+  - mid_spine
+  - tail_base
+  - tail_tip
+
+# Skeleton (plotting / refinement)
+skeleton:
+  - [left_ear, right_ear]
+  - [nose, left_ear]
+  - [nose, right_ear]
+  - [nose, mid_spine]
+  - [mid_spine, tail_base]
+  - [tail_base, tail_tip]
+pcutoff: 0.6
+
+# Frame sampling for labeling
+start: 0.02
+stop: 0.98
+numframes2pick: 250
+
+# Training / evaluation
+TrainingFraction:
+  - 0.95
+default_net_type: resnet_50
+default_augmenter: default
+batch_size: 8

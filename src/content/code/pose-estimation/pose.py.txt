@@ -1,0 +1,42 @@
+"""DeepLabCut pose-estimation pipeline.
+
+A ResNet-50 model (DeepLabCut, PyTorch backend) is trained on hand-labeled
+frames to track body keypoints, then run over session video to produce per-frame
+pose. The downstream tracker consumes a confidence-weighted centroid of the
+keypoints, so pose and the color detector are interchangeable measurement sources.
+"""
+import deeplabcut
+
+CONFIG = "config.yaml"   # project config (absolute paths / scorer stripped)
+KEYPOINTS = ["nose", "left_ear", "right_ear", "mid_spine", "tail_base", "tail_tip"]
+PCUTOFF = 0.6
+
+
+def build_and_train() -> None:
+    # Sample diverse frames to label (k-means over the video, not every Nth frame).
+    deeplabcut.extract_frames(CONFIG, mode="automatic", algo="kmeans", opencv=True)
+    # (GUI) hand-label KEYPOINTS, sanity-check, then train the ResNet-50 pose network.
+    deeplabcut.check_labels(CONFIG)
+    deeplabcut.create_training_dataset(CONFIG)
+    deeplabcut.train_network(CONFIG, shuffle=1, trainingsetindex=0)
+
+
+def infer(video: str) -> str:
+    # Run the trained model; writes per-frame keypoints + likelihoods to CSV.
+    deeplabcut.analyze_videos(CONFIG, [video], shuffle=1, save_as_csv=True, batch_size=16)
+    return video.replace(".mp4", "_pose.csv")
+
+
+def body_centroid(row, pcutoff: float = PCUTOFF):
+    """Confidence-weighted centroid of one frame's keypoints, or None.
+
+    Only keypoints above the likelihood cutoff count - this is the measurement
+    handed to the Kalman tracker, so a few occluded joints don't poison it.
+    """
+    good = [(row[f"{k}_x"], row[f"{k}_y"])
+            for k in KEYPOINTS if row[f"{k}_likelihood"] >= pcutoff]
+    if not good:
+        return None
+    cx = sum(x for x, _ in good) / len(good)
+    cy = sum(y for _, y in good) / len(good)
+    return cx, cy

@@ -1,43 +1,8 @@
-import { useState } from 'react'
-import { Check, Mail, MapPin } from 'lucide-react'
+import { FileText, Mail, MapPin } from 'lucide-react'
 import Reveal from '../ui/Reveal'
 import Button from '../ui/Button'
-import { DiscordIcon, LinkedInIcon } from '../ui/Icons'
+import { LinkedInIcon } from '../ui/Icons'
 import { site } from '../../data/site'
-
-/** Discord usernames aren't linkable, so this shows the handle and copies it on click. */
-function DiscordButton() {
-  const [copied, setCopied] = useState(false)
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(site.socials.discord)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1800)
-    } catch {
-      // Clipboard unavailable (e.g. insecure context) - the handle is visible in the label.
-    }
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={copy}
-      title="Click to copy my Discord username"
-      className="inline-flex max-w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-border bg-surface/60 px-5 py-3 text-center text-sm font-semibold text-fg backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/60 hover:text-accent active:translate-y-px"
-    >
-      {copied ? (
-        <>
-          <Check size={16} className="text-accent-2" /> Copied!
-        </>
-      ) : (
-        <>
-          <DiscordIcon className="h-4 w-4" /> {site.socials.discord}
-        </>
-      )}
-    </button>
-  )
-}
 
 export default function Contact() {
   return (
@@ -62,8 +27,8 @@ export default function Contact() {
           Let&apos;s build something that holds up
         </h2>
         <p className="mx-auto mt-4 max-w-2xl leading-relaxed text-muted">
-          I&apos;m open to full-stack engineering roles, Roblox systems work, and focused technical
-          audits where the goal is to turn ambiguity into a clear shipping path.
+          I&apos;m open to full-stack and software engineering roles, with a soft spot for real-time
+          systems, computer vision, and anything where the goal is to ship something that holds up.
         </p>
         <p className="mt-5 inline-flex items-center gap-1.5 text-sm text-muted">
           <MapPin size={14} className="text-accent-2" /> {site.location}
@@ -73,7 +38,9 @@ export default function Contact() {
           <Button href={`mailto:${site.email}`}>
             <Mail size={16} /> Email me
           </Button>
-          <DiscordButton />
+          <Button href={site.resumeUrl} variant="ghost" external>
+            <FileText size={16} /> Resume
+          </Button>
           <Button href={site.socials.linkedin} variant="ghost" external>
             <LinkedInIcon className="h-4 w-4" /> LinkedIn
           </Button>
