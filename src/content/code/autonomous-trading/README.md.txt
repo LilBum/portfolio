@@ -1,23 +1,21 @@
-# Algorithmic Trading System
+# Options Trading Sandbox
 
-An automated intraday options trading system. Pluggable signal engines feed a
-multi-layer risk engine and broker-agnostic execution, and every change is
-measured with a walk-forward backtester.
+Personal intraday options code. Signals can ask for a trade, but the risk layer
+gets final say. Paper/live adapters handle orders. New ideas go through
+walk-forward tests before I let them near real money.
 
-> Excerpts from a personal project. Live broker keys, account data, and
-> trade journals are kept out of these excerpts.
+> Personal project excerpt. Broker keys, account data, and trade journals are
+> removed.
 
-## Flow
-1. Per symbol, fetch intraday bars + the options chain.
-2. A signal engine (VWAP-pullback by default; ORB and mean-reversion variants)
-   decides CALL / PUT / NONE from trend, pullback, momentum, and regime filters.
-3. The risk engine sizes the position and applies hard controls
-   (daily-loss lockout, throttle, duplicate-order guard, kill switch).
-4. A broker adapter (Webull / IBKR / Tradier / paper) submits a bracket order;
-   every decision is journaled and reconciled.
+## How it moves
+1. Fetch intraday bars and the options chain for each symbol.
+2. Let the active signal module say CALL / PUT / NONE.
+3. Size the trade, then check daily loss, throttles, duplicates, and kill switch.
+4. Send the bracket order through Webull, IBKR, Tradier, or paper mode.
+5. Log the decision and reconcile it later.
 
 ## Layout
-- `engine.py` - per-symbol scan -> plan -> risk -> execute
+- `engine.py` - scan -> plan -> risk -> execute
 - `signal_engine.py` - VWAP-pullback signal logic
 - `risk.py` - position sizing + risk controls
 - `backtest/metrics.py` - Sharpe, drawdown, profit factor, Calmar

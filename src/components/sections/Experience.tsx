@@ -1,18 +1,19 @@
-import { CheckCircle2 } from 'lucide-react'
-import { experience } from '../../data/experience'
-import Reveal from '../ui/Reveal'
-import SectionHeading from '../ui/SectionHeading'
+import { CheckCircle2 } from 'lucide-react';
+import { experience } from '../../data/experience';
+import Reveal from '../ui/Reveal';
+import SectionHeading from '../ui/SectionHeading';
 
 export default function Experience() {
   return (
     <section id="experience" className="scroll-mt-24 bg-surface/35 px-6 py-24">
+      {' '}
       <div className="mx-auto max-w-6xl">
+        {' '}
         <SectionHeading
           eyebrow="Experience"
-          title="Production work that holds up"
-          description="Roles with measurable users, migration scope, testing, and delivery impact - references available on request."
+          title="Production experience with measurable impact"
+          description="Professional software work across regulated systems, customer-facing tools, legacy modernization, testing, and delivery for real users."
         />
-
         <div className="relative">
           <span
             aria-hidden
@@ -51,7 +52,10 @@ export default function Experience() {
 
                   <ul className="mt-6 grid gap-3 md:grid-cols-2">
                     {job.bullets.map((bullet) => (
-                      <li key={bullet} className="flex gap-3 text-sm leading-relaxed text-muted">
+                      <li
+                        key={bullet}
+                        className="flex gap-3 text-sm leading-relaxed text-muted"
+                      >
                         <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-accent-2" />
                         <span>{bullet}</span>
                       </li>
@@ -64,5 +68,5 @@ export default function Experience() {
         </div>
       </div>
     </section>
-  )
+  );
 }

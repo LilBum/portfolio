@@ -6,13 +6,14 @@ import Reveal from '../ui/Reveal'
 /** Animates the numeric part of a stat (e.g. "1,500+" or "95-100%") from 0 once visible. */
 function CountUp({ value }: { value: string }) {
   const match = value.match(/^([^\d]*)([\d,.]+)(.*)$/)
+  const numericParts = value.match(/\d[\d,.]*/g) ?? []
   const ref = useRef<HTMLSpanElement>(null)
   const inView = useInView(ref, { once: true, margin: '-40px' })
   const [display, setDisplay] = useState('0')
 
   const raw = match?.[2] ?? ''
   const target = raw ? parseFloat(raw.replace(/,/g, '')) : NaN
-  const animatable = !Number.isNaN(target)
+  const animatable = numericParts.length === 1 && !Number.isNaN(target)
 
   // rAF tween instead of framer's animate(): runs even when the OS prefers reduced motion.
   useEffect(() => {
@@ -31,7 +32,7 @@ function CountUp({ value }: { value: string }) {
     return () => cancelAnimationFrame(frame)
   }, [inView, animatable, target, raw])
 
-  if (!match) return <span>{value}</span>
+  if (!match || !animatable) return <span ref={ref}>{value}</span>
   return (
     <span ref={ref} className="tabular-nums">
       {match[1]}

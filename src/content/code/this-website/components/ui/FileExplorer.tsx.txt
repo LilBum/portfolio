@@ -20,6 +20,21 @@ function countFiles(nodes: TreeNode[]): number {
   return n
 }
 
+function findPreferredFile(nodes: TreeNode[], preferred?: string): CodeFile | null {
+  if (!preferred) return null
+  for (const node of nodes) {
+    if (node.type === 'file') {
+      if (node.file.path === preferred || node.file.name === preferred || node.file.path.endsWith(`/${preferred}`)) {
+        return node.file
+      }
+    } else {
+      const found = findPreferredFile(node.children, preferred)
+      if (found) return found
+    }
+  }
+  return null
+}
+
 type RowsProps = {
   nodes: TreeNode[]
   depth: number
@@ -93,8 +108,16 @@ function TreeRows({ nodes, depth, expanded, toggle, selectedPath, onSelect }: Ro
   )
 }
 
-export default function FileExplorer({ tree, className }: { tree: TreeNode[]; className?: string }) {
-  const initial = useMemo(() => firstFile(tree), [tree])
+export default function FileExplorer({
+  tree,
+  initialFile,
+  className,
+}: {
+  tree: TreeNode[]
+  initialFile?: string
+  className?: string
+}) {
+  const initial = useMemo(() => findPreferredFile(tree, initialFile) ?? firstFile(tree), [tree, initialFile])
   const total = useMemo(() => countFiles(tree), [tree])
   const [selected, setSelected] = useState<CodeFile | null>(initial)
   const [expanded, setExpanded] = useState<Set<string>>(() => collectFolders(tree, new Set()))

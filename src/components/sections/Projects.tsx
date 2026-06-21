@@ -8,9 +8,9 @@ export default function Projects() {
     <section id="projects" className="scroll-mt-24 px-6 py-24">
       <div className="mx-auto max-w-6xl">
         <SectionHeading
-          eyebrow="Selected work"
-          title="Projects with real systems behind them"
-          description="Production full-stack delivery, real-time computer vision and robotics, an algorithmic trading engine, and security-focused audit work."
+          eyebrow="Projects"
+          title="Projects that left receipts"
+          description="Production engineering first, then the research and independent systems where I go deeper — real-time computer vision, robotics, automation, and a live-game security audit with real money on the line."
         />
 
         <div className="grid gap-6 lg:grid-cols-2">

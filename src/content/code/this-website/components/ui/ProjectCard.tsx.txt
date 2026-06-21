@@ -237,6 +237,7 @@ export default function ProjectCard({ project }: { project: Project }) {
           subtitle={project.role}
           accent={project.accent}
           tree={code!.tree}
+          initialFile={project.snippet?.file}
         />
       )}
     </article>

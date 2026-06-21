@@ -1,12 +1,15 @@
-import { FileText, Mail, MapPin } from 'lucide-react'
-import Reveal from '../ui/Reveal'
-import Button from '../ui/Button'
-import { LinkedInIcon } from '../ui/Icons'
-import { site } from '../../data/site'
+import { FileText, Mail, MapPin } from 'lucide-react';
+import Reveal from '../ui/Reveal';
+import Button from '../ui/Button';
+import { LinkedInIcon } from '../ui/Icons';
+import { site } from '../../data/site';
 
 export default function Contact() {
   return (
-    <section id="contact" className="relative scroll-mt-24 overflow-hidden px-6 py-24 sm:py-28">
+    <section
+      id="contact"
+      className="relative scroll-mt-24 overflow-hidden px-6 py-24 sm:py-28"
+    >
       <div
         aria-hidden
         className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[34rem] w-[60rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,color-mix(in_srgb,var(--color-accent)_14%,transparent),transparent)]"
@@ -24,11 +27,13 @@ export default function Contact() {
           <span className="h-px w-7 bg-gradient-to-l from-transparent to-accent/70" />
         </p>
         <h2 className="text-balance font-display text-3xl font-bold tracking-tight sm:text-4xl">
-          Let&apos;s build something that holds up
+          Email is best
         </h2>
         <p className="mx-auto mt-4 max-w-2xl leading-relaxed text-muted">
-          I&apos;m open to full-stack and software engineering roles, with a soft spot for real-time
-          systems, computer vision, and anything where the goal is to ship something that holds up.
+          I&apos;m open to full-stack, frontend, backend, AI tooling, research
+          software, and contract systems work. The roles I like most still let
+          me get close to the hard parts: computer vision, real-time systems,
+          and anything reliability-critical.
         </p>
         <p className="mt-5 inline-flex items-center gap-1.5 text-sm text-muted">
           <MapPin size={14} className="text-accent-2" /> {site.location}
@@ -47,5 +52,5 @@ export default function Contact() {
         </div>
       </Reveal>
     </section>
-  )
+  );
 }

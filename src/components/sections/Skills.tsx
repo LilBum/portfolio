@@ -1,17 +1,18 @@
-import SectionHeading from '../ui/SectionHeading'
-import Reveal from '../ui/Reveal'
-import { skillGroups } from '../../data/skills'
+import SectionHeading from '../ui/SectionHeading';
+import Reveal from '../ui/Reveal';
+import { skillGroups } from '../../data/skills';
 
 export default function Skills() {
   return (
     <section id="skills" className="scroll-mt-24 bg-surface/35 px-6 py-24">
+      {' '}
       <div className="mx-auto max-w-6xl">
+        {' '}
         <SectionHeading
-          eyebrow="Toolbox"
+          eyebrow="Skills"
           title="The stack, end to end"
-          description="Full-stack web is my day-to-day; the rest is what I reach for in computer-vision, trading, and game-systems side projects."
+          description="Production full-stack work with Angular, AWS, Node, and testing, backed by hands-on systems work in Python, computer vision, robotics, AI tooling, and secure game architecture."
         />
-
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {skillGroups.map((group, i) => (
             <Reveal
@@ -37,5 +38,5 @@ export default function Skills() {
         </div>
       </div>
     </section>
-  )
+  );
 }

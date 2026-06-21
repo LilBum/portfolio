@@ -19,13 +19,22 @@ export type ProjectCode = {
   files: CodeFile[]
 }
 
-// Real source files copied into this repo as `.txt` (so tsc/eslint skip them) and
-// loaded raw at build time. The original extension is preserved before `.txt`.
-const raw = import.meta.glob('./code/**/*.txt', {
+// Real source files copied into this repo as `.txt` (so tsc/eslint skip them).
+// Keep this allowlist aligned with project `codeSlug` values so private or
+// unrelated samples cannot be pulled into the public bundle by accident.
+const raw = import.meta.glob(
+  [
+    './code/autonomous-trading/**/*.txt',
+    './code/behavioral-tracking/**/*.txt',
+    './code/pose-estimation/**/*.txt',
+    './code/this-website/**/*.txt',
+  ],
+  {
   query: '?raw',
   import: 'default',
   eager: true,
-}) as Record<string, string>
+  },
+) as Record<string, string>
 
 function sortNodes(nodes: TreeNode[]): void {
   nodes.sort((a, b) => {

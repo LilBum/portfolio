@@ -1,28 +1,79 @@
-export type SkillGroup = { label: string; items: string[] }
+export type SkillGroup = { label: string; items: string[] };
 
 export const skillGroups: SkillGroup[] = [
   {
-    label: 'Backend & Cloud',
-    items: ['Python', 'Java', 'C#', 'Node.js', 'AWS Lambda', 'S3', 'API Gateway', 'Flask', 'SQL'],
+    label: 'Frontend & web',
+    items: [
+      'Angular',
+      'React',
+      'TypeScript',
+      'JavaScript',
+      'Tailwind CSS',
+      'Vite',
+    ],
   },
   {
-    label: 'Frontend & Web',
-    items: ['Angular', 'React', 'TypeScript', 'JavaScript', 'Tailwind CSS', 'Vite'],
+    label: 'Backend & cloud',
+    items: [
+      'Node.js',
+      'Python',
+      'Java',
+      'Spring Boot',
+      'C#',
+      'Flask',
+      'REST APIs',
+      'SQL',
+      'AWS',
+      'Lambda',
+      'S3',
+      'API Gateway',
+    ],
   },
   {
-    label: 'Computer Vision & Robotics',
-    items: ['OpenCV', 'Kalman Filtering', 'Real-Time Tracking', 'Object Detection', 'Serial / Hardware Control'],
+    label: 'Testing & delivery',
+    items: [
+      'Jest',
+      'Unit Testing',
+      'CI/CD',
+      'Git',
+      'Agile/Scrum',
+      'Legacy Migration',
+      'Code Review',
+    ],
   },
   {
-    label: 'ML & Data',
-    items: ['NumPy', 'pandas', 'scikit-learn', 'PyTorch', 'TensorFlow', 'DeepLabCut'],
+    label: 'AI / ML / data',
+    items: [
+      'PyTorch',
+      'TensorFlow',
+      'scikit-learn',
+      'DeepLabCut',
+      'NumPy',
+      'pandas',
+      'LLM Integration',
+      'RAG Systems',
+    ],
   },
   {
-    label: 'AI Tooling',
-    items: ['Claude API', 'OpenAI', 'Prompt Engineering', 'LLM Integration'],
+    label: 'Computer vision & robotics',
+    items: [
+      'OpenCV',
+      'Kalman Filtering',
+      'Real-time Tracking',
+      'Object Detection',
+      'Pose Estimation',
+      'Serial / Hardware Control',
+    ],
   },
   {
-    label: 'Engineering & Game Systems',
-    items: ['Jest', 'CI/CD', 'Security Auditing', 'Luau', 'Anti-Exploit', 'Economy Systems'],
+    label: 'Game systems & security',
+    items: [
+      'Luau',
+      'Roblox Systems',
+      'Remote Security',
+      'Anti-exploit',
+      'Economy Systems',
+      'Security Audits',
+    ],
   },
-]
+];

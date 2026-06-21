@@ -2,7 +2,7 @@
 
   1. A COLOR MARKER (e.g. on the robot): its color is sampled at calibration,
      then thresholded in LAB color space. LAB separates a saturated color from a
-     light background more robustly than HSV under uneven lighting.
+     light background more reliably than HSV under uneven lighting.
 
   2. A DARK OBJECT on a light background: thresholded on the V (value) channel of
      HSV below a chosen level.

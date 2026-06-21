@@ -1,10 +1,12 @@
 export const site = {
   name: 'Alexander Urs-Badet',
   shortName: 'Alex',
+  url: 'https://alexanderursbadet.com',
   role: 'Full-Stack Software Engineer',
-  specialty: 'Angular/AWS web apps, with side projects in computer vision, robotics, and algorithmic trading',
+  specialty:
+    'Production Angular/AWS web applications, with additional depth in computer vision, robotics, automation, and secure game systems',
   tagline:
-    'I build production web applications for regulated environments - and on my own time, real-time computer-vision and robotics systems, an algorithmic options-trading engine, and server-authoritative game systems. Full-stack by trade, with real hands-on experience across AI/ML and systems work.',
+    'I build production web applications, backend systems, and AI-adjacent tools for real users. My professional work focuses on Angular/AWS systems in federally regulated environments, with additional project experience in computer vision, robotics, automation, and secure game architecture.',
   email: 'alexanderursbadet@gmail.com',
   location: 'Lynnwood, WA / Remote',
   resumeUrl: '/Alexander-Urs-Badet-Resume.pdf',
@@ -13,9 +15,9 @@ export const site = {
     linkedin: 'https://www.linkedin.com/in/alex-urs-badet-1a09a2220/',
     roblox: 'https://www.roblox.com/users/857636663/profile',
   },
-} as const
+} as const;
 
-export type NavLink = { label: string; href: string }
+export type NavLink = { label: string; href: string };
 
 export const navLinks: NavLink[] = [
   { label: 'About', href: '#about' },
@@ -23,4 +25,4 @@ export const navLinks: NavLink[] = [
   { label: 'Projects', href: '#projects' },
   { label: 'Skills', href: '#skills' },
   { label: 'Contact', href: '#contact' },
-]
+];

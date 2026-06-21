@@ -1,6 +1,6 @@
-# Alexander Urs-Badet — Portfolio
+# Alexander Urs-Badet - Portfolio
 
-Personal developer portfolio. Dark theme, pastel accents, code-window project visuals, scroll-linked SVG trail.
+Personal developer portfolio. Light theme, pastel accents, code-window project visuals, source browser, and scroll-linked SVG trail.
 
 **Stack:** Vite + React 19 + TypeScript + Tailwind CSS v4 + Framer Motion.
 
@@ -15,12 +15,14 @@ npm run preview  # serve the production build locally
 
 ## Editing content
 
-All copy lives in `src/data/` — components only render it:
+Most page copy lives in `src/data/` - components render it:
 
-- `site.ts` — name, role, tagline, email, socials, nav links
-- `projects.ts` — project cards, including the `snippet` (code window) and `uiChip` per project
-- `experience.ts` — jobs + impact stats
-- `skills.ts` — skill groups
+- `site.ts` - name, role, tagline, email, socials, nav links
+- `projects.ts` - project cards, including the `snippet` code window and `uiChip` per project
+- `experience.ts` - jobs + impact stats
+- `skills.ts` - skill groups
+
+Source-browser files live under `src/content/code/`. Keep the allowlist in `src/content/code.ts` aligned with project `codeSlug` values so unrelated samples do not ship in the public bundle.
 
 ## Deploying
 
@@ -30,9 +32,10 @@ The build is a fully static site (`dist/`), so any static host works.
 
 **Netlify:** same settings (build `npm run build`, publish `dist`).
 
-**After deploying:** in `index.html`, prefix the `og:image`, `twitter:image`, and (optionally add) `og:url` values with the production domain — social scrapers need absolute URLs.
+**After deploying:** keep the `og:url`, `og:image`, and `twitter:image` values in `index.html` aligned with the production domain. Social scrapers need absolute URLs.
 
 ## Notes
 
 - `public/og.jpg` is the social share card (1200x630). Regenerate if the name/role changes.
-- `unused-assets/` holds retired assets (old case-study screenshots, the resume PDF) kept out of `public/` so they don't ship. The site deliberately links no resume and no GitHub profile until the public repos are ready — LinkedIn and email are the contact spine.
+- `public/Alexander-Urs-Badet-Resume.pdf` is linked from the hero, contact section, and footer.
+- `unused-assets/` holds retired assets kept out of `public/` so they do not ship.

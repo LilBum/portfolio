@@ -5,49 +5,49 @@ import Button from '../ui/Button'
 import Reveal from '../ui/Reveal'
 
 const stats = [
-  { value: '296', label: 'scripts reviewed' },
-  { value: '54', label: 'dead legacy scripts flagged' },
-  { value: '10', label: 'critical fixes shipped live' },
-  { value: '$5k-$10k', label: 'fully phased fix scope' },
+  { value: '296', label: 'scripts read' },
+  { value: '54', label: 'disabled scripts' },
+  { value: '10', label: 'urgent fixes' },
+  { value: '$5k-$10k', label: 'cleanup range' },
 ]
 
 const criticalFindings = [
   {
-    title: 'The game sold things it never delivered',
-    body: 'A paid currency-multiplier pass silently granted nothing due to a one-line API misuse. Two entire shop tabs could not complete a purchase at all. A finished cosmetics wardrobe was fully built but never reachable by players. Lost revenue and refund/report risk, independent of any "bug."',
+    title: 'Players could pay and get nothing',
+    body: 'One paid currency pass called the wrong API, so it never paid out. Two shop tabs died mid-purchase. Cosmetics were in the code, but players had no path to them.',
   },
   {
-    title: 'A server script leaked a live webhook token',
-    body: 'A hardcoded third-party webhook (token included) fired on every player join - meaning the token was effectively public. The fix is one deletion, but the token also had to be revoked at the source, which became a written owner action item.',
+    title: 'A webhook token was sitting in server code',
+    body: 'A join script had a full webhook URL in it. I removed the call from Roblox code; the token still had to be revoked where it was created.',
   },
   {
-    title: 'A remote cloned anything the client asked for',
-    body: 'One RemoteEvent accepted a client-supplied Instance and cloned it to the player - free arbitrary items for any exploiter. Rewritten to a server-side name allowlist and verified live to reject Instance and table payloads.',
+    title: 'One remote would clone whatever the client sent',
+    body: 'A RemoteEvent took an Instance from the client and cloned it. Grants moved to a server allowlist, then I tried the ugly payloads again.',
   },
   {
-    title: 'A repeatable currency farm and god-mode remotes',
-    body: 'A social-reward handler granted premium currency on every fire with no claim flag, and two unauthenticated remotes allowed arbitrary stat writes. All were closed with one-time claim flags, cooldowns, and deletion of the unvalidated paths.',
+    title: 'Currency and stat remotes were too trusting',
+    body: 'The social reward paid premium currency every time it fired. Two stat remotes trusted callers they should not. Some paths got cooldowns and claim flags; the worst ones got deleted.',
   },
 ]
 
 const methodPoints = [
-  'Read-only first: the audit pass changed nothing, so the owner could share it safely with any developer for quotes',
-  'Every finding tagged with severity and human-dev effort, then bundled into priced phases - from a "stop the bleeding" pass costing a few hundred dollars up to the full scope',
-  'Each issue tied to its exact script and line, so any developer could action the document without re-discovery',
-  'Key findings independently re-checked - and two early findings were downgraded on re-review and said so in writing, so nothing in the report overstates risk',
+  'Read first, edit later. The owner needed something they could show other devs.',
+  'Severity, effort, and rough price went next to each issue.',
+  'Every claim had a script name and line reference beside it.',
+  'Two scary early findings got downgraded after I re-tested them.',
 ]
 
 const fixHighlights = [
-  'All ten critical security, economy, and paid-delivery findings fixed in a first implementation pass',
-  'Paid cosmetics and progression features wired end-to-end so owners actually receive what they bought',
-  'Fixes verified in live playtests: clean joins, one-time reward claims, exploit payloads rejected, no shop crashes',
-  'Owner handoff with the remaining phases, decision points, and security action items in writing',
+  'Ten security, economy, and purchase bugs went first.',
+  'Paid cosmetics and progression rewards now point at the things players bought.',
+  'Live checks covered joins, one-time rewards, bad payloads, and shop flows.',
+  'The owner kept the rest of the phase list, plus the security chores outside Roblox.',
 ]
 
 export default function AuditCaseStudy() {
   useEffect(() => {
     const prev = document.title
-    document.title = 'Roblox Live-Game Audit - Case Study | Alexander Urs-Badet'
+    document.title = 'Roblox Live-Game Audit - Case Study | Alex Urs-Badet'
     return () => {
       document.title = prev
     }
@@ -80,9 +80,8 @@ export default function AuditCaseStudy() {
             Auditing a live, monetized Roblox game
           </h1>
           <p className="mt-5 max-w-2xl text-pretty text-lg leading-relaxed text-muted">
-            A horror-genre Roblox experience with an active player base and real revenue needed to
-            know why things kept breaking - and what it would cost to fix. The client and game are
-            kept anonymous here; the numbers, method, and outcomes are real.
+            Live Roblox horror game. Real players, real purchases, and enough old code that bugs had
+            started stacking on top of each other. The game stays anonymous here; the counts do not.
           </p>
         </Reveal>
 
@@ -101,15 +100,13 @@ export default function AuditCaseStudy() {
           <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">The engagement</h2>
           <div className="mt-5 space-y-4 leading-relaxed text-muted">
             <p>
-              The game had a solid, modern core - a server-authoritative round loop and a
-              ProfileStore-backed data and shop layer - sitting on top of a large, half-wired legacy
-              layer inherited from an off-the-shelf template kit. Roughly 54 of its 296 scripts were
-              disabled, and most player-facing bugs lived at the seam between the two systems.
+              The new code was not the villain by itself. There was server round logic, ProfileStore
+              data, a newer shop, and older template-kit scripts living beside it. Fifty-four scripts
+              were disabled. The risky bugs lived in the overlap.
             </p>
             <p>
-              The brief: review everything read-only, produce a findings document the owner could act
-              on with any developer, and price the work in phases. After the owner reviewed the
-              findings, a follow-up engagement shipped the critical fixes directly in the live place.
+              Round one was read-only. Report first, price the cleanup in phases, then come back for
+              the urgent purchase and security fixes.
             </p>
           </div>
         </Reveal>
@@ -135,9 +132,9 @@ export default function AuditCaseStudy() {
             ))}
           </div>
           <p className="mt-5 text-sm leading-relaxed text-muted">
-            Beyond the critical group: a settings menu that was ~80% non-functional shell, finished
-            features sitting disabled, dead persistence paths, soft-locks in the core loop, and a
-            long tail of cleanup - each one written up with severity, effort, and price.
+            The small notes were still worth writing down: a mostly empty settings menu, finished
+            features left disabled, dead save paths, core-loop soft-locks, and too much cleanup to
+            price by guessing.
           </p>
         </Reveal>
 
@@ -176,8 +173,8 @@ export default function AuditCaseStudy() {
             Have a live game that needs this treatment?
           </h2>
           <p className="mx-auto mt-3 max-w-xl leading-relaxed text-muted">
-            I do read-only audits first, so you get a document you can act on with anyone - not a
-            sales pitch for my own hours.
+            I can start read-only and leave you with the report. No live edits unless you ask for the
+            fix pass.
           </p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
             <Button href={`mailto:${site.email}`}>

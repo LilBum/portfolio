@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
@@ -20,18 +20,54 @@ type Props = {
   subtitle?: string
   accent: Accent
   tree: TreeNode[]
+  initialFile?: string
 }
 
-export default function SourceModal({ open, onClose, title, subtitle, accent, tree }: Props) {
+const focusableSelector =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+export default function SourceModal({
+  open,
+  onClose,
+  title,
+  subtitle,
+  accent,
+  tree,
+  initialFile,
+}: Props) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
+      if (e.key !== 'Tab') return
+
+      const dialog = dialogRef.current
+      if (!dialog) return
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector))
+      if (focusable.length === 0) return
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
     }
     window.addEventListener('keydown', onKey)
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+    const frame = requestAnimationFrame(() => closeButtonRef.current?.focus())
     return () => {
+      cancelAnimationFrame(frame)
       window.removeEventListener('keydown', onKey)
       document.body.style.overflow = prevOverflow
     }
@@ -52,6 +88,8 @@ export default function SourceModal({ open, onClose, title, subtitle, accent, tr
             role="dialog"
             aria-modal="true"
             aria-label={`${title} source code`}
+            ref={dialogRef}
+            tabIndex={-1}
             className="relative flex h-[86vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-[0_40px_90px_-30px_rgba(63,42,96,0.45)]"
             initial={{ opacity: 0, scale: 0.97, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -68,6 +106,7 @@ export default function SourceModal({ open, onClose, title, subtitle, accent, tr
               </div>
               <button
                 type="button"
+                ref={closeButtonRef}
                 onClick={onClose}
                 aria-label="Close source viewer"
                 className="ml-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border bg-bg/60 text-muted transition-colors hover:border-border/80 hover:text-fg"
@@ -76,7 +115,7 @@ export default function SourceModal({ open, onClose, title, subtitle, accent, tr
               </button>
             </header>
 
-            <FileExplorer tree={tree} className="flex-1" />
+            <FileExplorer tree={tree} initialFile={initialFile} className="flex-1" />
           </motion.div>
         </motion.div>
       )}

@@ -1,20 +1,17 @@
 # Real-Time Tracking & Robot Control
 
-A computer-vision system that detects and tracks two moving objects on live
-video and steers a mobile robot in closed loop. Built for a research lab.
+Lab tracking code for two moving objects and a mobile robot. The annoying part:
+keeping IDs stable when blobs cross, disappear, or come back noisy.
 
-> Anonymized excerpts. Lab-, hardware-, and study-specific details have been
-> removed; the techniques are unchanged.
+> Lab excerpt. Hardware and study details are removed.
 
-## Flow
-1. `capture.py` reads frames in a thread with latest-frame semantics, so a slow
-   processing iteration never causes us to track a stale frame.
-2. `detection.py` segments two objects by color (LAB / HSV thresholding +
-   morphology), returning contour centroids. (A companion DeepLabCut model can
-   provide keypoint-based detections too - see the pose-estimation project.)
-3. `tracker.py` runs one constant-velocity Kalman filter per object, with gated
-   association and occlusion handling, so identity survives missed detections.
-4. The controller steers the robot over `comms/interface.py` from the live track.
+## How it moves
+1. `capture.py` keeps the newest camera frame in a thread.
+2. `detection.py` finds the two objects with LAB / HSV thresholding, cleanup,
+   and contour centroids.
+3. `tracker.py` runs one constant-velocity Kalman filter per object. Gates and
+   occlusion handling keep missed detections from swapping IDs.
+4. The controller sends robot commands through `comms/interface.py`.
 
 ## Layout
 - `capture.py` - threaded frame grabber
