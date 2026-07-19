@@ -24,7 +24,9 @@ export type ProjectCode = {
 // unrelated samples cannot be pulled into the public bundle by accident.
 const raw = import.meta.glob(
   [
+    './code/aegis-trader/**/*.txt',
     './code/autonomous-trading/**/*.txt',
+    './code/listing-studio/**/*.txt',
     './code/behavioral-tracking/**/*.txt',
     './code/pose-estimation/**/*.txt',
     './code/this-website/**/*.txt',
@@ -106,7 +108,7 @@ function parse(): Record<string, ProjectCode> {
 
 export const projectCode: Record<string, ProjectCode> = parse()
 
-/** Depth-first first file in a tree — used as the explorer's default selection. */
+/** Depth-first first file in a tree - used as the explorer's default selection. */
 export function firstFile(nodes: TreeNode[]): CodeFile | null {
   for (const node of nodes) {
     if (node.type === 'file') return node.file

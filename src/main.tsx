@@ -9,8 +9,8 @@ import App from './App'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {/* Motion v12 disables animations when the OS has reduced motion on; this site opts for always-on motion. */}
-    <MotionConfig reducedMotion="never">
+    {/* Honor the OS "reduce motion" setting: Motion snaps animations to their end state. */}
+    <MotionConfig reducedMotion="user">
       <App />
     </MotionConfig>
   </StrictMode>,

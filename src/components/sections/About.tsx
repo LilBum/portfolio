@@ -12,16 +12,14 @@ const strengths = [
   },
   {
     title: 'Systems that hold up',
-    copy: 'Risk engines, anti-exploit game systems, security audits, and backend architecture where correctness, reliability, and abuse cases matter.',
+    copy: 'Risk engines, reverse-engineered network protocols, anti-exploit game systems, and security audits where correctness, reliability, and abuse cases matter.',
   },
 ];
 
 export default function About() {
   return (
     <section id="about" className="scroll-mt-24 px-6 py-24">
-      {' '}
       <div className="mx-auto max-w-6xl">
-        {' '}
         <SectionHeading
           eyebrow="About"
           title="A production engineer with research-systems depth"
@@ -49,15 +47,16 @@ export default function About() {
               I also build research and independent systems where the code has
               to answer to messy real-world inputs: cameras losing targets,
               robots needing stable control, trading systems requiring strict
-              risk limits, and Roblox clients sending untrusted data. That is
-              the kind of engineering I enjoy most, systems that have to hold up
-              when conditions are imperfect.
+              risk limits, and a live game&apos;s binary protocol reconstructed
+              from captured traffic. That is the kind of engineering I enjoy
+              most, systems that have to hold up when conditions are imperfect.
             </p>
 
             <p>
-              Recently, that has included neuroscience and robotics software:
-              behavioral tracking, pose-estimation pipelines, and robot-control
-              tooling used in lab settings. I&apos;m especially interested in
+              Lately that has spanned neuroscience and robotics software
+              (behavioral tracking, pose-estimation, robot control), an
+              options-trading bot built around a fail-closed risk engine, and a
+              reverse-engineered game server. I&apos;m especially interested in
               software that connects production engineering, AI-adjacent tools,
               and real-time systems.
             </p>

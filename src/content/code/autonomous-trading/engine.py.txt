@@ -6,6 +6,7 @@ have been elided to keep the control flow readable.
 import uuid
 
 from .engines import VwapPullbackSignalEngine
+from .journal import Journal
 from .risk import RiskEngine
 from .planner import Planner
 from .data.provider_factory import create_market_data_provider
@@ -17,6 +18,7 @@ class PlannerApp:
         self.provider, self.provider_name = create_market_data_provider(config)
         signal_engine = VwapPullbackSignalEngine(config["strategy"])
         self.planner = Planner(signal_engine, RiskEngine(), config["options"])
+        self.journal = Journal(config["journal"])
         self.execution_enabled = bool(config.get("execution", {}).get("enabled", False))
         self._live_mode = config.get("mode", "paper").lower() == "live"
 
@@ -42,6 +44,7 @@ class PlannerApp:
 
             # The planner runs signal -> instrument selection -> risk sizing and
             # returns a fully-formed, auditable plan (ALLOWED / REJECTED + reasons).
+            # signal/selection/risk feed the journal entries elided from this excerpt.
             plan, signal, selection, risk = self.planner.build_plan(symbol, bars, chain, self.config)
             plan.run_id = run_id
             plans.append(plan)

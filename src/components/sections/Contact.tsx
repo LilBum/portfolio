@@ -30,10 +30,10 @@ export default function Contact() {
           Email is best
         </h2>
         <p className="mx-auto mt-4 max-w-2xl leading-relaxed text-muted">
-          I&apos;m open to full-stack, frontend, backend, AI tooling, research
-          software, and contract systems work. The roles I like most still let
-          me get close to the hard parts: computer vision, real-time systems,
-          and anything reliability-critical.
+          I&apos;m looking for full-stack, frontend, and backend engineering
+          roles; contract systems work is welcome too. The roles I like most
+          still let me get close to the hard parts: real-time systems, computer
+          vision, and anything reliability-critical.
         </p>
         <p className="mt-5 inline-flex items-center gap-1.5 text-sm text-muted">
           <MapPin size={14} className="text-accent-2" /> {site.location}

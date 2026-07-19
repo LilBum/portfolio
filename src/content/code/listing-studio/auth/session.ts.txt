@@ -1,0 +1,87 @@
+import "server-only";
+
+import { createHash, randomBytes } from "node:crypto";
+import { cookies } from "next/headers";
+
+import { getDatabase } from "@/lib/db";
+
+// Trimmed excerpt: config, types, and the revocation/cleanup helpers are
+// elided. Sessions are opaque: the browser holds a random token, the
+// database holds only its hash - a leaked sessions table reveals nothing.
+
+function tokenHash(token: string): string {
+  return createHash("sha256").update(token, "utf8").digest("hex");
+}
+
+export async function createOwnerSession(
+  ownerId: number,
+  metadata: SessionMetadata = {},
+): Promise<string> {
+  const token = randomBytes(32).toString("base64url");
+  const createdAt = new Date();
+  const expiresAt = new Date(createdAt.getTime() + SESSION_DURATION_SECONDS * 1000);
+
+  const database = await getDatabase();
+  await database.run(
+    `
+      INSERT INTO sessions (
+        token_hash, owner_id, expires_at, created_at, last_seen_at, ip_address, user_agent
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `,
+    [
+      tokenHash(token),
+      ownerId,
+      expiresAt.toISOString(),
+      createdAt.toISOString(),
+      createdAt.toISOString(),
+      cleanMetadataValue(metadata.ipAddress, 64),
+      cleanMetadataValue(metadata.userAgent, 512),
+    ],
+  );
+
+  const cookieStore = await cookies();
+  cookieStore.set(SESSION_COOKIE_NAME, token, {
+    ...getSessionCookieOptions(),
+    expires: expiresAt,
+  });
+
+  return token;
+}
+
+export async function getOwnerForSessionToken(token: string): Promise<Owner | null> {
+  if (!/^[A-Za-z0-9_-]{43}$/.test(token)) {
+    return null;
+  }
+
+  const database = await getDatabase();
+  const digest = tokenHash(token);
+  const row = await database.get<Owner & { expiresAt: string; lastSeenAt: string }>(
+    `
+      SELECT o.*, s.expires_at AS "expiresAt", s.last_seen_at AS "lastSeenAt"
+      FROM sessions s
+      JOIN owner_accounts o ON o.id = s.owner_id
+      WHERE s.token_hash = ? AND s.revoked_at IS NULL
+    `,
+    [digest],
+  );
+
+  if (!row) {
+    return null;
+  }
+
+  const currentTime = Date.now();
+  if (Date.parse(row.expiresAt) <= currentTime) {
+    await database.run("DELETE FROM sessions WHERE token_hash = ?", [digest]);
+    return null;
+  }
+
+  // Touch last_seen_at at most every five minutes to keep writes cheap.
+  if (currentTime - Date.parse(row.lastSeenAt) > 5 * 60 * 1000) {
+    await database.run("UPDATE sessions SET last_seen_at = ? WHERE token_hash = ?", [
+      new Date(currentTime).toISOString(),
+      digest,
+    ]);
+  }
+
+  return row;
+}

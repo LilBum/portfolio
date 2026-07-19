@@ -1,0 +1,70 @@
+import "server-only";
+
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+} from "node:crypto";
+
+// Trimmed excerpt: the decrypt path and PKCE helpers are elided. Refresh
+// tokens never touch the database in plaintext - they are sealed in an
+// AES-256-GCM envelope bound to a context string (AAD), under a versioned
+// key so rotation never requires re-authorizing the shop.
+
+const AES_GCM_IV_BYTES = 12;
+const AES_KEY_BYTES = 32;
+
+export interface EtsyEncryptedSecret {
+  ciphertext: string;
+  iv: string;
+  authTag: string;
+  keyVersion: number;
+}
+
+function currentKeyVersion(): number {
+  const version = Number(process.env.ETSY_TOKEN_ENCRYPTION_KEY_VERSION ?? "1");
+  if (!Number.isSafeInteger(version) || version <= 0) {
+    throw new EtsyConfigurationError();
+  }
+  return version;
+}
+
+function encryptionKey(version: number): Buffer {
+  const encodedKey = process.env[
+    `ETSY_TOKEN_ENCRYPTION_KEY_V${version}`
+  ]?.trim();
+  if (!encodedKey || !/^[A-Za-z0-9_-]{43}$/.test(encodedKey)) {
+    throw new EtsyConfigurationError();
+  }
+  const key = Buffer.from(encodedKey, "base64url");
+  if (key.byteLength !== AES_KEY_BYTES || key.toString("base64url") !== encodedKey) {
+    throw new EtsyConfigurationError();
+  }
+  return key;
+}
+
+export function encryptEtsySecret(
+  plaintext: string,
+  aad: string,
+): EtsyEncryptedSecret {
+  if (!plaintext || !aad) {
+    throw new Error("A secret and encryption context are required.");
+  }
+  const keyVersion = currentKeyVersion();
+  const iv = randomBytes(AES_GCM_IV_BYTES);
+  const cipher = createCipheriv("aes-256-gcm", encryptionKey(keyVersion), iv);
+  cipher.setAAD(Buffer.from(aad, "utf8"));
+
+  const ciphertext = Buffer.concat([
+    cipher.update(plaintext, "utf8"),
+    cipher.final(),
+  ]);
+
+  return {
+    ciphertext: ciphertext.toString("base64url"),
+    iv: iv.toString("base64url"),
+    authTag: cipher.getAuthTag().toString("base64url"),
+    keyVersion,
+  };
+}

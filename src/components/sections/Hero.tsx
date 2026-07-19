@@ -1,36 +1,52 @@
-import { motion } from 'framer-motion';
-import { ArrowDown, FileText, Mail, MapPin, ShieldCheck } from 'lucide-react';
+import { motion, useReducedMotion } from 'framer-motion';
+import {
+  ArrowDown,
+  CheckCircle2,
+  FileText,
+  Mail,
+  MapPin,
+  ShieldCheck,
+} from 'lucide-react';
 import { site } from '../../data/site';
 import Button from '../ui/Button';
-import CodeWindow from '../ui/CodeWindow';
 import { LinkedInIcon } from '../ui/Icons';
 
 const iconLink =
   'inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-surface/60 text-muted backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/60 hover:text-fg';
 
-const heroSnippet = `// validated before the request reaches AWS
-readonly loanForm = this.fb.group({
-  principal: [0, [Validators.required, Validators.min(1)]],
-  termMonths: [12, monthRange(6, 480)],
-  rateApr: [0, Validators.max(0.45)],
-})
+// The hero spotlights the FSA work with details instead of code - the code
+// itself is private federal client work.
+const heroHighlights = [
+  'Used daily by 1,500+ FSA staff and applicants',
+  'Screens demoed to senior FSA staff and congressional contacts',
+  'Financial calculator cut a mostly manual workflow by ~40%',
+  'Legacy Java/Struts modernized to Angular and Spring Boot',
+];
 
-submit() {
-  if (this.loanForm.invalid) return
-
-  const dto = this.loanForm.getRawValue()
-  this.api.consolidate(dto)
-    .subscribe(plan => this.go('/plan', plan.id))
-}`;
+const heroStack = ['Angular', 'AWS', 'Node.js', 'Spring Boot', 'Jest'];
 
 export default function Hero() {
+  const reduce = useReducedMotion();
+  const float = (from: number, to: number, delay = 0) =>
+    reduce
+      ? {}
+      : {
+          animate: { y: [from, to] },
+          transition: {
+            duration: 4.6,
+            repeat: Infinity,
+            repeatType: 'reverse' as const,
+            ease: 'easeInOut' as const,
+            delay,
+          },
+        };
+
   return (
     <section className="hero-section relative flex items-center overflow-hidden px-6 py-16 pt-28 sm:py-24 sm:pt-32">
-      {' '}
       <div
         aria-hidden
         className="absolute inset-0 -z-10 bg-[radial-gradient(48rem_30rem_at_78%_18%,color-mix(in_srgb,var(--color-accent)_13%,transparent),transparent_65%),radial-gradient(40rem_26rem_at_8%_82%,color-mix(in_srgb,var(--color-accent-2)_9%,transparent),transparent_62%)]"
-      />{' '}
+      />
       <div className="absolute inset-x-0 bottom-0 -z-10 h-44 bg-[linear-gradient(0deg,var(--color-bg)_0%,rgba(252,248,244,0)_100%)]" />
       <div className="hero-content mx-auto min-w-0 sm:w-full sm:max-w-6xl lg:grid lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-14">
         <div className="min-w-0">
@@ -44,7 +60,7 @@ export default function Hero() {
 
           <h1 className="max-w-4xl text-balance font-display text-5xl font-bold leading-[1.04] tracking-tight text-fg sm:text-7xl lg:text-6xl xl:text-7xl">
             {site.name}
-            <span className="mt-3 block max-w-[18rem] bg-gradient-to-r from-accent-2 via-accent to-accent-3 bg-clip-text text-[1.55rem] leading-tight text-transparent sm:max-w-none sm:text-4xl lg:text-3xl xl:text-4xl">
+            <span className="mt-3 block max-w-[20rem] text-[1.75rem] leading-tight text-accent sm:max-w-none sm:text-4xl lg:text-4xl xl:text-5xl">
               {site.role}
             </span>
           </h1>
@@ -89,35 +105,50 @@ export default function Hero() {
         <div aria-hidden className="relative hidden min-w-0 lg:block">
           <div className="absolute -inset-10 rounded-full bg-[radial-gradient(closest-side,color-mix(in_srgb,var(--color-accent)_12%,transparent),transparent)]" />
 
-          <CodeWindow
-            file="loan-form.component.ts"
-            code={heroSnippet}
-            lang="ts"
-            className="relative rotate-[1.2deg] shadow-[0_32px_80px_-30px_rgba(63,42,96,0.28)]"
-          />
+          <div className="relative min-w-0 max-w-full rotate-[1.2deg] overflow-hidden rounded-xl border border-border/90 bg-bg/85 text-left shadow-[0_32px_80px_-30px_rgba(63,42,96,0.28)] backdrop-blur">
+            <div className="flex items-center gap-2 border-b border-border/70 bg-surface/80 px-3.5 py-2.5">
+              <span className="h-2 w-2 rounded-full bg-accent-3/70" />
+              <span className="h-2 w-2 rounded-full bg-accent/70" />
+              <span className="h-2 w-2 rounded-full bg-accent-2/70" />
+              <span className="ml-1.5 truncate font-mono text-[10px] text-muted">
+                FSA Debt Consolidation Platform
+              </span>
+              <span className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-accent-2">
+                2023 - present
+              </span>
+            </div>
+            <ul className="space-y-3 px-4 py-4">
+              {heroHighlights.map((item) => (
+                <li key={item} className="flex gap-2.5 text-[13px] leading-relaxed text-muted">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-accent-2" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-wrap items-center gap-1.5 px-4 pb-3">
+              {heroStack.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full border border-border bg-surface/70 px-2.5 py-0.5 font-mono text-[10px] text-muted"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+            <p className="border-t border-border/70 bg-surface/60 px-4 py-2.5 font-mono text-[10px] text-muted">
+              Federal client work - details private, including the code
+            </p>
+          </div>
 
           <motion.div
-            animate={{ y: [-7, 7] }}
-            transition={{
-              duration: 4.2,
-              repeat: Infinity,
-              repeatType: 'reverse',
-              ease: 'easeInOut',
-            }}
+            {...float(-7, 7)}
             className="absolute -right-5 top-10 inline-flex items-center gap-2 rounded-2xl bg-accent px-4 py-2.5 text-sm font-bold text-bg shadow-[0_16px_36px_-12px_rgba(124,58,237,0.42)]"
           >
-            <ShieldCheck size={15} /> Validated flow
+            <ShieldCheck size={15} /> Federally regulated
           </motion.div>
 
           <motion.div
-            animate={{ y: [6, -6] }}
-            transition={{
-              duration: 5,
-              repeat: Infinity,
-              repeatType: 'reverse',
-              ease: 'easeInOut',
-              delay: 0.6,
-            }}
+            {...float(6, -6, 0.6)}
             className="absolute -left-7 bottom-9 w-44 rounded-2xl border border-border bg-surface/90 p-3.5 shadow-[0_18px_40px_-16px_rgba(63,42,96,0.20)] backdrop-blur"
           >
             <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.12em] text-muted">

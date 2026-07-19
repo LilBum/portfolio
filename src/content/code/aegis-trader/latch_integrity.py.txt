@@ -1,0 +1,52 @@
+"""Canonical validation and restart fingerprints for durable safety latches.
+
+Trimmed excerpt: the per-latch payload validators and SQLite row readers are
+elided. Latches (kill switch, daily/weekly loss, drawdown, order-mismatch)
+persist as canonical JSON with a SHA-256 fingerprint, so a restarted process
+can prove it restored exactly the safety state it shut down with - a latch
+that silently resets is treated as corruption, not a fresh start.
+"""
+
+import hashlib
+import json
+import re
+
+LATCH_SCHEMA_VERSION = 1
+
+GENERIC_LATCH_NAMES = frozenset({
+    "adjusted_contract", "contract_mismatch", "exit_market_data", "kill",
+    "order_mismatch", "order_uncertain", "orphan", "position_mismatch",
+    "risk_state", "unbalanced", "unexpected_stock",
+})
+LOSS_LATCH_NAMES = frozenset({"daily_loss", "weekly_loss", "drawdown"})
+LATCH_EVENT_TYPES = frozenset({
+    "RISK_LATCH_CHANGED", "RISK_STATE_UPDATED",
+    "DAILY_DIRECTION_SET", "LOSS_LATCH_CHANGED",
+})
+_LOWER_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+
+
+class LatchIntegrityError(ValueError):
+    """Raised when persisted latch state is not canonical or safe."""
+
+
+def _canonical_json(value: object) -> str:
+    return json.dumps(
+        value,
+        allow_nan=False,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
+def _canonical_sha256(value: object) -> str:
+    return hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest()
+
+
+def _require_exact_keys(payload: dict, required: frozenset[str]) -> None:
+    observed = frozenset(payload)
+    if observed != required:
+        raise LatchIntegrityError(
+            f"payload keys must be exactly {sorted(required)!r}; observed {sorted(observed)!r}"
+        )

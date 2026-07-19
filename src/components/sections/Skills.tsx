@@ -5,9 +5,7 @@ import { skillGroups } from '../../data/skills';
 export default function Skills() {
   return (
     <section id="skills" className="scroll-mt-24 bg-surface/35 px-6 py-24">
-      {' '}
       <div className="mx-auto max-w-6xl">
-        {' '}
         <SectionHeading
           eyebrow="Skills"
           title="The stack, end to end"

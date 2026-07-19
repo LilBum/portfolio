@@ -1,0 +1,42 @@
+"""Paper-only Interactive Brokers adapter for defined-risk XSP option spreads.
+
+Trimmed excerpt: the asyncio wrapper around the ibapi threading client, quote
+assembly, and the combo-order lifecycle are elided. The adapter refuses
+non-paper ports, starts read-only, and treats "ready" and "reconciled" as
+explicit checklists of broker messages rather than assumptions - the risk
+engine blocks entries until every marker has arrived.
+"""
+
+from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
+
+_EASTERN = ZoneInfo("America/New_York")
+
+# Paper/gateway ports only - there is no live-account mode in this build.
+_PAPER_PORTS = frozenset({4002, 7496, 7497})
+
+# IBKR wire codes, sorted by what they mean for safety.
+_INFORMATION_CODES = frozenset({2104, 2106, 2107, 2108, 2158})
+_CONNECTIVITY_LOST_CODES = frozenset({1100, 1300, 2110})
+_CONNECTIVITY_RESTORED_CODES = frozenset({1101, 1102})
+_ORDER_REJECT_CODES = frozenset({103, 201, 203, 321})
+_CANCEL_STATE_CODES = frozenset({161, 10147, 10148})
+_FATAL_CODES = frozenset({100, 502, 504, 507})
+
+_ACCOUNT_VALUE_TAGS = frozenset({"NetLiquidation", "SettledCash", "TotalCashValue"})
+
+# The adapter is not "ready" until every marker arrives...
+_READY_MARKERS = frozenset(
+    {"next_valid_id", "account_selected", "account_end", "positions_end", "orders_end"}
+)
+# ...and not "reconciled" until open orders, positions, and executions agree.
+_RECONCILIATION_MARKERS = frozenset(
+    {"account_end", "positions_end", "orders_end", "completed_orders_end", "executions_end"}
+)
+
+# Tick types worth trusting for spread pricing.
+_BID_PRICE_TICKS = frozenset({1, 66})
+_ASK_PRICE_TICKS = frozenset({2, 67})
+_OPEN_INTEREST_TICKS = frozenset({27, 28})
+_CHAIN_EXCHANGES = frozenset({"SMART", "CBOE"})
+_EXECUTION_EXCHANGE = "CBOE"

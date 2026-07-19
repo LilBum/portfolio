@@ -32,40 +32,164 @@ export type Project = {
   codeSlug?: string;
   accent: Accent;
   year?: string;
+  /** Renders full-width as the lead card above the grid. */
+  featured?: boolean;
 };
 
+// Order is intentional: production, quant, and research work lead; game-adjacent
+// projects (game server, Roblox audit) sit at the end of the grid.
 export const projects: Project[] = [
   {
     title: 'FSA Debt Consolidation Platform',
     category: 'Production software',
     role: 'Angular/AWS loan-software work',
     blurb:
-      'Production loan-software work for a federally regulated application: validations, legacy flows, edge cases, tests, and the details that keep real workflows reliable.',
+      'Production loan-software work for a federally regulated application: validations, legacy flows, edge cases, tests, and the details that keep real workflows reliable for staff and applicants.',
     impact: [
       'Built Angular forms and pages used by 1,500+ FSA staff and applicants',
       'Shipped debt-consolidation screens demoed to senior FSA staff and congressional contacts',
+      'Built an AWS/Angular/Node calculator that cut a mostly manual workflow by ~40%',
       'Maintained 95-100% Jest coverage on front-end modules I owned',
     ],
-    tags: ['Angular', 'AWS', 'Node.js', 'Jest'],
+    tags: ['Angular', 'AWS', 'Node.js', 'Spring Boot', 'Jest'],
     visualLabel: '1,500+ daily users',
-    snippet: {
-      file: 'loan-form.component.ts',
-      lang: 'ts',
-      code: `readonly loanForm = this.fb.group({
-  principal: [0, Validators.min(1)],
-  termMonths: [12, monthRange(6, 480)],
-})
-
-submit() {
-  if (this.loanForm.invalid) return
-  const dto = this.loanForm.getRawValue()
-  this.api.consolidate(dto)
-    .subscribe(p => this.go('/plan', p.id))
-}`,
-    },
-    uiChip: 'Calculate plan',
+    note: 'Federal client work - details kept private, including the code',
     accent: 'violet',
     year: '2023-present',
+    featured: true,
+  },
+  {
+    title: 'Listing Studio',
+    category: 'Full-stack product',
+    role: 'Next.js commerce workspace and content pipeline',
+    blurb:
+      'A private, owner-only workspace that runs a digital-products business end to end: listing creation and validation, Etsy and YouTube integrations, a bounded daily content pipeline, and the product factory that builds what the shop sells.',
+    impact: [
+      'Built the auth layer from scratch: owner bootstrap, opaque hashed DB-backed sessions, and single-use recovery with full session revocation',
+      'Integrated Etsy and YouTube OAuth with PKCE, AES-GCM-encrypted refresh tokens under versioned keys, and deliberately minimal scopes - no deletes, no transaction writes',
+      'Runs SQLite locally and Neon Postgres plus private Vercel Blob in production behind one persistence boundary, with tests and production smoke checks per surface',
+    ],
+    tags: ['Next.js', 'React', 'TypeScript', 'PostgreSQL', 'OAuth'],
+    snippet: {
+      file: 'session.ts',
+      lang: 'ts',
+      code: `// opaque sessions: the browser holds a random token,
+// the database only ever sees its hash
+const token = randomBytes(32).toString("base64url")
+
+await db.run(
+  \`INSERT INTO sessions (token_hash, owner_id, expires_at)
+   VALUES (?, ?, ?)\`,
+  [sha256(token), ownerId, expiresAt.toISOString()],
+)
+
+cookieStore.set(SESSION_COOKIE, token, {
+  httpOnly: true, sameSite: "lax", expires: expiresAt,
+})`,
+    },
+    uiChip: 'Sign in',
+    note: 'Private production system - walkthrough on request',
+    codeSlug: 'listing-studio',
+    accent: 'pink',
+    year: '2026',
+  },
+  {
+    title: 'AegisTrader Options Research System',
+    category: 'Quant systems / risk engineering',
+    role: 'IBKR paper bot with a risk-first design',
+    blurb:
+      'A paper-only Interactive Brokers bot that evaluates SPY five-minute bars and trades at most one defined-risk XSP vertical at a time. The risk engine and a reproducible proof system are deliberately larger than the signal - the point is disciplined, verifiable execution, not claimed returns.',
+    impact: [
+      'Built a fail-closed risk engine: per-trade and daily/weekly loss latches, a drawdown latch, PDT guard, cash reserves, a one-contract cap, and a kill switch',
+      'Wrote a "proof" harness that emits a reproducible evidence bundle each run - exact-build check, live API/WebSocket probes, SQLite state, and a restart-survival comparison',
+      'Integrated IBKR paper via native combo orders, read-only by default, keeping the broker authoritative; profitability is explicitly treated as not established',
+    ],
+    tags: ['Python', 'IBKR API', 'Risk Engine', 'WebSockets', 'SQLite'],
+    snippet: {
+      file: 'risk.py',
+      lang: 'py',
+      code: `# every entry gate appends a reason; any reason blocks the trade
+if not connected:  reasons.append("BROKER_DISCONNECTED")
+if not reconciled: reasons.append("BROKER_NOT_RECONCILED")
+if latched:        reasons.append("RISK_LATCHED")
+if account_age > MAX_ACCOUNT_AGE_SECONDS:
+    reasons.append("STALE_ACCOUNT_SNAPSHOT")
+if entries_today >= limits.max_entries_per_day:
+    reasons.append("DAILY_ENTRY_LIMIT")
+
+return RiskDecision(not reasons, tuple(reasons), checked_at)`,
+    },
+    uiChip: 'Proof run',
+    note: 'Independent research project - walkthrough on request',
+    codeSlug: 'aegis-trader',
+    accent: 'teal',
+    year: '2026',
+  },
+  {
+    title: 'Intraday Options Trading System',
+    category: 'Quant research / backtesting',
+    role: 'Signal engines, risk layer, and a walk-forward backtester',
+    blurb:
+      'The earlier generation of my trading work, and the system AegisTrader grew out of: pluggable signal engines over intraday bars and options chains, a multi-layer risk gate, and broker-agnostic execution. New ideas went through walk-forward tests before they were allowed near anything real.',
+    impact: [
+      'Built pluggable signal engines - VWAP-pullback, opening-range breakout, and mean-reversion - over intraday bars and options chains',
+      'Engineered a multi-layer risk gate: ATR/premium position sizing, daily-loss lockouts, cooldowns, throttles, and a kill switch',
+      'Validated ideas with a walk-forward backtester (Sharpe, drawdown, profit factor) and routed orders through Webull/IBKR/Tradier/paper adapters',
+    ],
+    tags: ['Python', 'pandas', 'Options', 'Backtesting', 'Signal Engines'],
+    snippet: {
+      file: 'risk.py',
+      lang: 'py',
+      code: `# size by risk budget, then cap by premium and hard limits
+risk_per_contract = option_mid * 100 * premium_stop_pct
+contracts = floor(account_equity * risk_pct / risk_per_contract)
+contracts = min(contracts, max_by_premium, max_contracts)
+
+if contracts <= 0:
+    return reject("risk_budget_too_small")
+if realized_pnl <= -max_daily_loss:
+    return reject("daily_loss_lockout")
+submit_bracket(order, contracts)`,
+    },
+    uiChip: 'Risk check',
+    note: 'Predecessor to AegisTrader - superseded by the risk-first rebuild',
+    codeSlug: 'autonomous-trading',
+    accent: 'violet',
+  },
+  {
+    title: 'This Website',
+    category: 'Web frontend',
+    role: 'React site and source viewer',
+    blurb:
+      'A portfolio site built to make technical work visible without forcing visitors to leave for GitHub. Project data, code snippets, and source walkthroughs are built directly into the experience.',
+    impact: [
+      'Built scroll trail, nav behavior, count-up stats, reveal animations, and project cards',
+      'Removed heavy SVG blur after profiling scroll performance and identifying sticky rendering behavior',
+      'Kept project data, snippets, and source-explorer content in typed files for easier maintenance',
+    ],
+    tags: ['React', 'TypeScript', 'Tailwind v4', 'Framer Motion'],
+    visualLabel: 'You are here',
+    snippet: {
+      file: 'ScrollTrail.tsx',
+      lang: 'ts',
+      code: `const { scrollYProgress } = useScroll()
+const spring = useSpring(scrollYProgress, {
+  stiffness: 500,
+  damping: 90,
+})
+
+const place = (v: number) => {
+  const pt = path.getPointAtLength(v * total)
+  headX.set(pt.x)
+  headY.set(pt.y)
+}
+spring.on("change", place)`,
+    },
+    uiChip: 'You are here',
+    note: 'Live - you are browsing it',
+    codeSlug: 'this-website',
+    accent: 'teal',
+    year: '2026',
   },
   {
     title: 'Real-Time Tracking & Robot Control',
@@ -128,6 +252,37 @@ return Detection(cx, cy)`,
     accent: 'violet',
   },
   {
+    title: 'Idle-RPG Server & Combat Simulator',
+    category: 'Reverse engineering / systems',
+    role: 'Protocol RE, game server, and a combat-sim web app',
+    blurb:
+      'A self-hosted server for a live mobile RPG, reconstructed from captured traffic and a decompiled client. It speaks the game’s TCP/protobuf protocol well enough to drive a real client from boot to home screen, and a separate web app simulates and optimizes team damage.',
+    impact: [
+      'Reverse-engineered a length-prefixed protobuf wire protocol from proxy captures and decompiled client schemas',
+      'Built a ~14k-line async Python server (TCP + HTTP asset patcher) plus a combat engine with damage formulas calibrated against captured fights',
+      'Shipped a FastAPI web app - roster viewer, team builder, fight sim, and support-slot optimizer - with explicit caveats where the model is directional, not magnitude-exact',
+    ],
+    tags: ['Python', 'Reverse Engineering', 'Protobuf', 'asyncio', 'FastAPI'],
+    visualLabel: '14k-line game server',
+    snippet: {
+      file: 'codec.py',
+      lang: 'py',
+      code: `# 2-byte length prefix, then [cmd_type, sub_cmd] opcode, then a protobuf body
+def pop_frames(self, buf: bytes):
+    while len(buf) >= 2:
+        (size,) = struct.unpack(">H", buf[:2])
+        if len(buf) < 2 + size:
+            break                       # partial frame; wait for more bytes
+        cmd_type, sub_cmd = buf[2], buf[3]
+        yield Frame(cmd_type, sub_cmd, buf[4 : 2 + size])
+        buf = buf[2 + size :]           # dispatch(opcode) -> @on() handler`,
+    },
+    uiChip: 'Boot → home',
+    note: 'Personal research project - walkthrough on request',
+    accent: 'teal',
+    year: '2026',
+  },
+  {
     title: 'Live-Game Audit & Remediation',
     category: 'Security consulting',
     role: 'Roblox audit, estimate, and fix pass',
@@ -158,73 +313,6 @@ Remotes.GrantItem.OnServerEvent
     uiChip: 'Claim item',
     caseStudy: '#/case-study/roblox-audit',
     accent: 'pink',
-    year: '2026',
-  },
-  {
-    title: 'Algorithmic Trading System',
-    category: 'Quantitative trading / automation',
-    role: 'Options experiments with risk controls',
-    blurb:
-      'An intraday options research system for testing strategies before any live execution. The signal layer is intentionally smaller than the risk layer, with controls for sizing, loss limits, order duplication, and shutdown behavior.',
-    impact: [
-      'Tested VWAP pullbacks, opening-range breakouts, and mean-reversion ideas on intraday data',
-      'Implemented daily-loss stops, cooldowns, duplicate-order checks, sizing caps, and a kill switch',
-      'Built paper/live adapters, bracket orders, logs, reconciliation, and walk-forward testing workflow',
-    ],
-    tags: ['Python', 'Options', 'Backtesting', 'Risk Engine'],
-    snippet: {
-      file: 'risk.py',
-      lang: 'py',
-      code: `# size by risk budget, then cap by premium and hard limits
-risk_per_contract = option_mid * 100 * premium_stop_pct
-contracts = floor(account_equity * risk_pct / risk_per_contract)
-contracts = min(contracts, max_by_premium, max_contracts)
-
-if contracts <= 0:
-    return reject("risk_budget_too_small")
-if realized_pnl <= -max_daily_loss:
-    return reject("daily_loss_lockout")
-submit_bracket(order, contracts)`,
-    },
-    uiChip: 'Place order',
-    note: 'Independent project - walkthrough on request',
-    codeSlug: 'autonomous-trading',
-    accent: 'teal',
-    year: '2026',
-  },
-  {
-    title: 'This Website',
-    category: 'Web frontend',
-    role: 'React site and source viewer',
-    blurb:
-      'A portfolio site built to make technical work visible without forcing visitors to leave for GitHub. Project data, code snippets, and source walkthroughs are built directly into the experience.',
-    impact: [
-      'Built scroll trail, nav behavior, count-up stats, reveal animations, and project cards',
-      'Removed heavy SVG blur after profiling scroll performance and identifying sticky rendering behavior',
-      'Kept project data, snippets, and source-explorer content in typed files for easier maintenance',
-    ],
-    tags: ['React', 'TypeScript', 'Tailwind v4', 'Framer Motion'],
-    visualLabel: 'You are here',
-    snippet: {
-      file: 'ScrollTrail.tsx',
-      lang: 'ts',
-      code: `const { scrollYProgress } = useScroll()
-const spring = useSpring(scrollYProgress, {
-  stiffness: 500,
-  damping: 90,
-})
-
-const place = (v: number) => {
-  const pt = path.getPointAtLength(v * total)
-  headX.set(pt.x)
-  headY.set(pt.y)
-}
-spring.on("change", place)`,
-    },
-    uiChip: 'You are here',
-    note: 'Live - you are browsing it',
-    codeSlug: 'this-website',
-    accent: 'teal',
     year: '2026',
   },
 ];

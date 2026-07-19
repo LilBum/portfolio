@@ -9,11 +9,14 @@ function CountUp({ value }: { value: string }) {
   const numericParts = value.match(/\d[\d,.]*/g) ?? []
   const ref = useRef<HTMLSpanElement>(null)
   const inView = useInView(ref, { once: true, margin: '-40px' })
-  const [display, setDisplay] = useState('0')
 
   const raw = match?.[2] ?? ''
   const target = raw ? parseFloat(raw.replace(/,/g, '')) : NaN
   const animatable = numericParts.length === 1 && !Number.isNaN(target)
+
+  // Start at the real value so non-scrolling renderers (crawlers) never see
+  // "0"; the tween's first frame resets it once the strip actually animates.
+  const [display, setDisplay] = useState(raw || '0')
 
   // rAF tween instead of framer's animate(): runs even when the OS prefers reduced motion.
   useEffect(() => {

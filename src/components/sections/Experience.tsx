@@ -6,9 +6,7 @@ import SectionHeading from '../ui/SectionHeading';
 export default function Experience() {
   return (
     <section id="experience" className="scroll-mt-24 bg-surface/35 px-6 py-24">
-      {' '}
       <div className="mx-auto max-w-6xl">
-        {' '}
         <SectionHeading
           eyebrow="Experience"
           title="Production experience with measurable impact"

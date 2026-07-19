@@ -1,0 +1,53 @@
+import "server-only";
+
+// Trimmed excerpt: the begin/complete OAuth flow, token refresh, and
+// connection views are elided. The rules that matter survive the trim:
+// a connection is valid only if Etsy granted EXACTLY the requested scopes,
+// state expires in ten minutes, and anything shown back to the owner
+// (like the shop URL) is re-validated before it renders.
+
+const OAUTH_STATE_LIFETIME_MS = 10 * 60 * 1_000;
+const CONNECTION_VERIFICATION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1_000;
+
+export class EtsyOAuthStateError extends Error {
+  constructor() {
+    super("The Etsy authorization state is invalid or expired.");
+    this.name = "EtsyOAuthStateError";
+  }
+}
+
+/** The grant must match the requested scopes exactly - no more, no less. */
+function exactScopeGrant(scopes: readonly string[]): boolean {
+  const expected = [...ETSY_OAUTH_SCOPES].sort();
+  const actual = [...new Set(scopes)].sort();
+  return expected.length === actual.length &&
+    expected.every((scope, index) => scope === actual[index]);
+}
+
+function freshVerification(lastVerifiedAt: string | null, currentTime: Date): boolean {
+  if (!lastVerifiedAt || !Number.isFinite(currentTime.getTime())) return false;
+  const verifiedAt = Date.parse(lastVerifiedAt);
+  const age = currentTime.getTime() - verifiedAt;
+  return Number.isFinite(verifiedAt) &&
+    age >= 0 &&
+    age < CONNECTION_VERIFICATION_MAX_AGE_MS;
+}
+
+/** Never render a shop URL the API returned without re-validating it. */
+function safeEtsyShopUrl(value: string | null): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase();
+    const isEtsyHost = hostname === "etsy.com" || hostname.endsWith(".etsy.com");
+    return url.protocol === "https:" &&
+      isEtsyHost &&
+      !url.port &&
+      !url.username &&
+      !url.password
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}

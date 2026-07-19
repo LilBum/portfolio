@@ -37,7 +37,7 @@ function buildPath(w: number, h: number): string {
   return d
 }
 
-/* Glow = stacked widening strokes, NOT a blur() filter — blurring a page-height
+/* Glow = stacked widening strokes, NOT a blur() filter - blurring a page-height
    SVG re-rasterizes every scroll frame and can freeze the renderer. */
 const glowLayers = [
   { width: 13, opacity: 0.1 },

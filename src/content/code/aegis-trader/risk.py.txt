@@ -1,0 +1,82 @@
+"""Fail-closed entry risk and unconditional position-reducing exit policy.
+
+Trimmed excerpt: exit policy, weekly-loss and drawdown latch math, and the
+model/config classes are elided. The shape that matters: every gate appends
+a reason, any reason blocks the entry, and malformed input fails closed.
+"""
+
+from datetime import UTC, datetime
+from decimal import Decimal, ROUND_FLOOR
+
+ZERO = Decimal("0")
+MULTIPLIER = Decimal("100")
+MAX_ACCOUNT_AGE_SECONDS = 30
+
+
+def effective_risk_capital(net_liquidation: Decimal, limits: RiskLimits) -> Decimal:
+    """Bound risk buying power by the configured strategy capital cap."""
+    return min(net_liquidation, limits.strategy_capital_cap)
+
+
+def entry_risk_budget(net_liquidation: Decimal, limits: RiskLimits) -> Decimal:
+    """Return the capped strategy-capital entry budget."""
+    return min(
+        effective_risk_capital(net_liquidation, limits) * limits.per_trade_fraction,
+        limits.per_trade_dollar_cap,
+    )
+
+
+def size_entry_contracts(debit: Decimal, net_liquidation: Decimal, limits: RiskLimits) -> int:
+    """Size whole contracts by defined max loss and both contract caps."""
+    per_contract = debit * MULTIPLIER + limits.fee_reserve_per_spread
+    raw = entry_risk_budget(net_liquidation, limits) / per_contract
+    whole = int(raw.to_integral_value(rounding=ROUND_FLOOR))
+    return max(0, min(whole, limits.max_contracts, limits.rollout_contract_cap))
+
+
+class RiskEngine:
+    def preflight_entry(self, *, proposal, account, checked_at, **counts) -> RiskDecision:
+        """Evaluate every entry gate; malformed inputs fail closed."""
+        try:
+            return self._preflight_entry(proposal=proposal, account=account,
+                                         checked_at=checked_at, **counts)
+        except Exception:
+            return RiskDecision(False, ("INVALID_INPUT",), checked_at)
+
+    def _preflight_entry(self, *, proposal, account, checked_at, entries_today,
+                         entries_this_week, connected, reconciled,
+                         execution_enabled, account_allowed, latched) -> RiskDecision:
+        reasons: list[str] = []
+        if not connected:
+            reasons.append("BROKER_DISCONNECTED")
+        if not reconciled:
+            reasons.append("BROKER_NOT_RECONCILED")
+        if not execution_enabled:
+            reasons.append("EXECUTION_DISABLED")
+        if latched:
+            reasons.append("RISK_LATCHED")
+
+        account_age = (checked_at - account.timestamp).total_seconds()
+        if account_age > MAX_ACCOUNT_AGE_SECONDS:
+            reasons.append("STALE_ACCOUNT_SNAPSHOT")
+
+        affordable = size_entry_contracts(
+            proposal.candidate.natural_debit, account.net_liquidation, self.limits,
+        )
+        if affordable <= 0 or proposal.quantity > affordable:
+            reasons.append("PER_TRADE_RISK_LIMIT")
+        if proposal.quantity > self.limits.max_contracts:
+            reasons.append("CONTRACT_HARD_CAP")
+
+        reserve = effective_risk_capital(account.net_liquidation, self.limits) \
+            * self.limits.cash_reserve_fraction
+        if cash_after_this_entry(account, proposal, self.limits) < reserve:
+            reasons.append("CASH_RESERVE_LIMIT")
+        if entries_today >= self.limits.max_entries_per_day:
+            reasons.append("DAILY_ENTRY_LIMIT")
+        if entries_this_week >= self.limits.max_entries_per_week:
+            reasons.append("WEEKLY_ENTRY_LIMIT")
+        if account.rolling_day_trades >= self.limits.max_rolling_day_trades:
+            reasons.append("PDT_ROLLING_DAY_TRADE_BLOCK")
+
+        return RiskDecision(not reasons, tuple(reasons), checked_at)

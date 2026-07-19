@@ -4,16 +4,14 @@ export const site = {
   url: 'https://alexanderursbadet.com',
   role: 'Full-Stack Software Engineer',
   specialty:
-    'Production Angular/AWS web applications, with additional depth in computer vision, robotics, automation, and secure game systems',
+    'Production Angular/AWS web applications end to end, with independent depth in computer vision, quant systems, and reverse engineering',
   tagline:
-    'I build production web applications, backend systems, and AI-adjacent tools for real users. My professional work focuses on Angular/AWS systems in federally regulated environments, with additional project experience in computer vision, robotics, automation, and secure game architecture.',
+    'I build and ship production web software: Angular and AWS systems used daily by roughly 1,500 federal loan officers and applicants. Outside work I go deeper on systems - computer vision for a research lab, a risk-first trading bot, and a reverse-engineered game server.',
   email: 'alexanderursbadet@gmail.com',
   location: 'Lynnwood, WA / Remote',
   resumeUrl: '/Alexander-Urs-Badet-Resume.pdf',
   socials: {
-    github: 'https://github.com/LilBum',
     linkedin: 'https://www.linkedin.com/in/alex-urs-badet-1a09a2220/',
-    roblox: 'https://www.roblox.com/users/857636663/profile',
   },
 } as const;
 

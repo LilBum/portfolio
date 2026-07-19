@@ -6,6 +6,7 @@ export const skillGroups: SkillGroup[] = [
     items: [
       'Angular',
       'React',
+      'Next.js',
       'TypeScript',
       'JavaScript',
       'Tailwind CSS',
@@ -20,13 +21,14 @@ export const skillGroups: SkillGroup[] = [
       'Java',
       'Spring Boot',
       'C#',
-      'Flask',
+      'FastAPI',
       'REST APIs',
+      'WebSockets',
       'SQL',
+      'PostgreSQL',
       'AWS',
       'Lambda',
       'S3',
-      'API Gateway',
     ],
   },
   {
@@ -50,8 +52,6 @@ export const skillGroups: SkillGroup[] = [
       'DeepLabCut',
       'NumPy',
       'pandas',
-      'LLM Integration',
-      'RAG Systems',
     ],
   },
   {
@@ -66,14 +66,14 @@ export const skillGroups: SkillGroup[] = [
     ],
   },
   {
-    label: 'Game systems & security',
+    label: 'Reverse engineering & security',
     items: [
-      'Luau',
-      'Roblox Systems',
-      'Remote Security',
+      'Reverse Engineering',
+      'Protobuf',
+      'Network Protocols',
       'Anti-exploit',
-      'Economy Systems',
       'Security Audits',
+      'Luau / Roblox',
     ],
   },
 ];

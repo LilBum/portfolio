@@ -1,0 +1,43 @@
+"""Independent evidence capture for AegisTrader's paper-only options runtime.
+
+Trimmed excerpt: the HTTP/WebSocket probes, SQLite schema inspection, and
+report writers are elided. Each proof run emits a machine-readable bundle -
+exact-build check, live API and WebSocket probes, ledger reconciliation, and
+a restart-survival comparison - so "it works on my machine" becomes a file
+someone else can inspect. None of it is profit evidence, and the thresholds
+below exist to say so: a track record that fails them is labeled unproven.
+"""
+
+from decimal import Decimal
+
+EVIDENCE_SCHEMA_VERSION = 3
+
+# Economic history must be reproduced row-for-row across a restart.
+STABLE_ECONOMIC_TABLES = ("contracts", "trades", "trade_legs", "combo_orders", "executions")
+STABLE_ROW_KEYS = {
+    "contracts": ("con_id",),
+    "trades": ("trade_id",),
+    "trade_legs": ("trade_id", "role"),
+    "combo_orders": ("intent_id",),
+    "executions": ("execution_id",),
+}
+
+ACTIVE_TRADE_STATUSES = frozenset({"OPENING", "OPEN", "CLOSING"})
+VALID_ORDER_STATUSES = frozenset(
+    {"RESERVED", "SUBMITTED", "PARTIALLY_FILLED", "FILLED", "CANCELED", "REJECTED"}
+)
+
+# Minimum history before a paper track record even counts as evidence.
+MIN_CLOSED_TRADES = 60
+MIN_HISTORY_SESSIONS = 20
+MIN_HISTORY_CALENDAR_DAYS = 90
+
+# Concentration guards: one lucky trade, session, or direction can't carry it.
+MAX_TRADE_DOMINANCE = Decimal("0.25")
+MAX_SESSION_DOMINANCE = Decimal("0.35")
+MAX_DIRECTION_DOMINANCE = Decimal("0.80")
+
+# Results must survive stressed costs, not just mid-price fills.
+STRESS_COST_PER_TRADE = Decimal("10.00")
+MIN_STRESSED_PROFIT_FACTOR = Decimal("1.20")
+MAX_STRESSED_DRAWDOWN = Decimal("400.00")
