@@ -94,6 +94,25 @@ cookieStore.set(SESSION_COOKIE, token, {
     year: '2026',
   },
   {
+    title: 'A&D Home Care & Aging with Grace AFH',
+    category: 'Production client website',
+    role: 'End-to-end design, development, owner-managed automation, local SEO, and Cloudflare deployment',
+    blurb:
+      'The live marketing, contact, and room-availability site for two operating, licensed Washington adult family homes. I turned the owners\' requirements and photography into a production presence for families comparing care in Lynnwood and Everett.',
+    impact: [
+      'Took the project from business requirements and raw owner photos through responsive design, implementation, custom-domain launch, and git-driven Cloudflare Worker deployment',
+      'Built three pre-rendered routes with unique search and social metadata, LocalBusiness/FAQ/Breadcrumb structured data, a sitemap, robots rules, and cache headers',
+      'Built an owner-managed room-availability workflow with Google Forms, Sheets, and Apps Script behind a validated Cloudflare Worker API, adding automatic expiration, edge caching, and fail-safe fallbacks without requiring code access or redeployment',
+    ],
+    tags: ['React', 'TypeScript', 'Google Apps Script', 'Google Sheets', 'Cloudflare Workers', 'Technical SEO'],
+    image: '/ad-home-care-production.png',
+    imageAlt:
+      'Live A&D Home Care and Aging with Grace AFH website shown on its production domain',
+    href: 'https://kingsgateafh.org',
+    accent: 'teal',
+    year: '2026',
+  },
+  {
     title: 'AegisTrader Options Research System',
     category: 'Quant systems / risk engineering',
     role: 'IBKR paper bot with a risk-first design',

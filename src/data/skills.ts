@@ -32,15 +32,17 @@ export const skillGroups: SkillGroup[] = [
     ],
   },
   {
-    label: 'Testing & delivery',
+    label: 'AI-assisted engineering & delivery',
     items: [
+      'Claude Code',
+      'OpenAI Codex',
+      'Git',
+      'Code Review',
+      'CI/CD',
       'Jest',
       'Unit Testing',
-      'CI/CD',
-      'Git',
       'Agile/Scrum',
       'Legacy Migration',
-      'Code Review',
     ],
   },
   {
@@ -66,14 +68,14 @@ export const skillGroups: SkillGroup[] = [
     ],
   },
   {
-    label: 'Reverse engineering & security',
+    label: 'Security & systems',
     items: [
-      'Reverse Engineering',
-      'Protobuf',
-      'Network Protocols',
-      'Anti-exploit',
+      'Application Security',
       'Security Audits',
-      'Luau / Roblox',
+      'Static Analysis',
+      'OAuth / PKCE',
+      'Session Security',
+      'Network Protocols',
     ],
   },
 ];

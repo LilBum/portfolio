@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { ArrowUpRight, CheckCircle2, Code, FolderTree, Star } from 'lucide-react'
+import { ArrowUpRight, BadgeCheck, CheckCircle2, Code, FolderTree, Star } from 'lucide-react'
 import type { Project } from '../../data/projects'
 import { cn } from '../../lib/cn'
 import { projectCode } from '../../content/code'
+import ArchitectureVisual from './ArchitectureVisual'
 import CodeWindow from './CodeWindow'
 import SourceModal from './SourceModal'
 
@@ -42,17 +43,34 @@ const accentSource: Record<Project['accent'], string> = {
   pink: 'border-accent-3/40 text-accent-3 hover:border-accent-3/70 hover:bg-accent-3/10',
 }
 
-export default function ProjectCard({ project }: { project: Project }) {
+const accentBadge: Record<Project['accent'], string> = {
+  violet: 'border-accent/35 bg-accent/5 text-accent',
+  teal: 'border-accent-2/35 bg-accent-2/5 text-accent-2',
+  pink: 'border-accent-3/35 bg-accent-3/5 text-accent-3',
+}
+
+export default function ProjectCard({ project, wide = false }: { project: Project; wide?: boolean }) {
   const [sourceOpen, setSourceOpen] = useState(false)
   const code = project.codeSlug ? projectCode[project.codeSlug] : undefined
   const hasSource = !!code && code.files.length > 0
   const featured = !!project.featured
+  const wideLayout = featured || wide
 
-  const media = project.snippet ? (
+  const media = project.architecture ? (
+    <div
+      className={cn(
+        'flex min-h-[19rem] items-stretch overflow-hidden border-b border-border bg-linear-to-br p-4 sm:aspect-[16/10] sm:min-h-0 sm:p-6',
+        wideLayout && 'lg:aspect-auto lg:border-b-0 lg:border-r lg:p-8',
+        accentWash[project.accent],
+      )}
+    >
+      <ArchitectureVisual visual={project.architecture} accent={project.accent} />
+    </div>
+  ) : project.snippet ? (
     <div
       className={cn(
         'relative flex items-center justify-center border-b border-border bg-linear-to-br p-3 py-5 sm:aspect-[16/10] sm:p-6',
-        featured && 'lg:aspect-auto lg:border-b-0 lg:border-r lg:p-8',
+        wideLayout && 'lg:aspect-auto lg:border-b-0 lg:border-r lg:p-8',
         accentWash[project.accent],
       )}
     >
@@ -62,7 +80,7 @@ export default function ProjectCard({ project }: { project: Project }) {
         lang={project.snippet.lang}
         className={cn(
           'w-full min-w-0 max-w-[27rem] transition-transform duration-500 group-hover:scale-[1.015]',
-          featured && 'lg:max-w-[30rem]',
+          wideLayout && 'lg:max-w-[30rem]',
         )}
       />
       {project.uiChip && (
@@ -77,7 +95,12 @@ export default function ProjectCard({ project }: { project: Project }) {
       )}
     </div>
   ) : project.image ? (
-    <div className="aspect-[16/10] overflow-hidden border-b border-border bg-surface-2">
+    <div
+      className={cn(
+        'aspect-[16/10] overflow-hidden border-b border-border bg-surface-2',
+        wideLayout && 'lg:aspect-auto lg:border-b-0 lg:border-r',
+      )}
+    >
       <img
         src={project.image}
         alt={project.imageAlt ?? ''}
@@ -89,7 +112,7 @@ export default function ProjectCard({ project }: { project: Project }) {
     <div
       className={cn(
         'flex aspect-[16/10] flex-col justify-between border-b border-border bg-linear-to-br p-5',
-        featured && 'lg:aspect-auto lg:border-b-0 lg:border-r lg:p-8',
+        wideLayout && 'lg:aspect-auto lg:border-b-0 lg:border-r lg:p-8',
         accentWash[project.accent],
       )}
     >
@@ -116,12 +139,22 @@ export default function ProjectCard({ project }: { project: Project }) {
   )
 
   const body = (
-    <div className={cn('flex flex-1 flex-col p-6', featured && 'lg:justify-center lg:p-8')}>
-      {featured && (
-        <p className="mb-3 inline-flex w-fit items-center gap-1.5 rounded-full border border-border bg-bg/60 px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-eyebrow text-muted">
-          <Star size={11} className={accentText[project.accent]} /> Featured work
+    <div className={cn('flex flex-1 flex-col p-6', wideLayout && 'lg:justify-center lg:p-8')}>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        {featured && (
+          <p className="inline-flex w-fit items-center gap-1.5 rounded-full border border-border bg-bg/60 px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-eyebrow text-muted">
+            <Star size={11} className={accentText[project.accent]} /> Featured work
+          </p>
+        )}
+        <p
+          className={cn(
+            'inline-flex w-fit items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-eyebrow',
+            accentBadge[project.accent],
+          )}
+        >
+          <BadgeCheck size={11} /> {project.status}
         </p>
-      )}
+      </div>
       <div className="mb-3 flex items-start justify-between gap-4">
         <div>
           <p
@@ -135,7 +168,7 @@ export default function ProjectCard({ project }: { project: Project }) {
           <h3
             className={cn(
               'mt-1.5 font-display text-xl font-bold tracking-tight',
-              featured && 'sm:text-2xl',
+              wideLayout && 'sm:text-2xl',
             )}
           >
             {project.title}
@@ -149,7 +182,7 @@ export default function ProjectCard({ project }: { project: Project }) {
       <p className="text-sm font-medium text-fg">{project.role}</p>
       <p className="mt-3 text-sm leading-relaxed text-muted">{project.blurb}</p>
 
-      <ul className={cn('mt-5 grid gap-2.5', featured && 'sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2')}>
+      <ul className={cn('mt-5 grid gap-2.5', wideLayout && 'sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2')}>
         {project.impact.map((item) => (
           <li key={item} className="flex gap-2.5 text-sm leading-relaxed text-muted">
             <CheckCircle2 className={cn('mt-0.5 h-4 w-4 shrink-0', accentText[project.accent])} />
@@ -209,7 +242,7 @@ export default function ProjectCard({ project }: { project: Project }) {
               accentText[project.accent],
             )}
           >
-            View
+            {project.hrefLabel ?? 'View project'}
             <ArrowUpRight
               size={16}
               className="transition-transform duration-200 group-hover/link:-translate-y-0.5 group-hover/link:translate-x-0.5"
@@ -239,7 +272,7 @@ export default function ProjectCard({ project }: { project: Project }) {
     <article
       className={cn(
         'group relative flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-surface/65 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_56px_-26px_rgba(63,42,96,0.22)]',
-        featured && 'lg:grid lg:grid-cols-[1.05fr_0.95fr] lg:items-stretch',
+        wideLayout && 'lg:grid lg:grid-cols-[1.05fr_0.95fr] lg:items-stretch',
         accentBorder[project.accent],
       )}
     >

@@ -17,6 +17,7 @@ export const experience: Experience[] = [
       'Shipped debt-consolidation screens demoed to senior FSA staff and congressional contacts.',
       'Built an AWS, Angular, and Node.js financial calculator that reduced a mostly manual workflow by ~40%.',
       'Migrated legacy Java/Struts modules toward Angular and Spring Boot while maintaining high Jest coverage on owned front-end modules.',
+      'Previously favorably adjudicated for a USDA Public Trust contractor position.',
     ],
   },
   {

@@ -25,11 +25,9 @@ export type ProjectCode = {
 const raw = import.meta.glob(
   [
     './code/aegis-trader/**/*.txt',
-    './code/autonomous-trading/**/*.txt',
     './code/listing-studio/**/*.txt',
     './code/behavioral-tracking/**/*.txt',
     './code/pose-estimation/**/*.txt',
-    './code/this-website/**/*.txt',
   ],
   {
   query: '?raw',
@@ -37,6 +35,10 @@ const raw = import.meta.glob(
   eager: true,
   },
 ) as Record<string, string>
+
+const sourceGroupAliases: Record<string, string> = {
+  'pose-estimation': 'behavioral-tracking',
+}
 
 function sortNodes(nodes: TreeNode[]): void {
   nodes.sort((a, b) => {
@@ -85,8 +87,10 @@ function parse(): Record<string, ProjectCode> {
     const rel = key.replace(/^\.\/code\//, '').replace(/\.txt$/, '')
     const slash = rel.indexOf('/')
     if (slash === -1) continue
-    const slug = rel.slice(0, slash)
-    const path = rel.slice(slash + 1)
+    const sourceGroup = rel.slice(0, slash)
+    const slug = sourceGroupAliases[sourceGroup] ?? sourceGroup
+    const sourcePath = rel.slice(slash + 1)
+    const path = sourceGroup === slug ? sourcePath : `${sourceGroup}/${sourcePath}`
     const name = path.slice(path.lastIndexOf('/') + 1)
     const ext = name.slice(name.lastIndexOf('.') + 1)
     const code = raw[key].replace(/\r\n/g, '\n').replace(/\s+$/, '')

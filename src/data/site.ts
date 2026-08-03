@@ -1,17 +1,17 @@
 export const site = {
   name: 'Alexander Urs-Badet',
   shortName: 'Alex',
-  url: 'https://alexanderursbadet.com',
+  url: 'https://alexub-portfolio.vercel.app',
   role: 'Full-Stack Software Engineer',
   specialty:
-    'Production Angular/AWS web applications end to end, with independent depth in computer vision, quant systems, and reverse engineering',
+    'Production Angular/AWS applications, modern full-stack products, and deployed client software, with additional depth in computer vision and reliable systems',
   tagline:
-    'I build and ship production web software: Angular and AWS systems used daily by roughly 1,500 federal loan officers and applicants. Outside work I go deeper on systems - computer vision for a research lab, a risk-first trading bot, and a reverse-engineered game server.',
+    'I build and ship production web software across regulated loan systems, a private full-stack product, and a public client site. My work spans Angular, AWS, Next.js, reliable integrations, computer vision, and risk-first systems.',
   email: 'alexanderursbadet@gmail.com',
   location: 'Lynnwood, WA / Remote',
   resumeUrl: '/Alexander-Urs-Badet-Resume.pdf',
   socials: {
-    linkedin: 'https://www.linkedin.com/in/alex-urs-badet-1a09a2220/',
+    linkedin: 'https://www.linkedin.com/in/alexander-urs-badet-1a09a2220/',
   },
 } as const;
 

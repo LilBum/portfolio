@@ -13,7 +13,7 @@ export default function Projects() {
         <SectionHeading
           eyebrow="Projects"
           title="Projects that left receipts"
-          description="Production engineering first, then the independent and research systems where I go deeper - an options bot built around a hard risk engine, real-time computer vision and robotics, and lower-level reverse-engineering and security work."
+          description="Selected engineering work across regulated production software, private full-stack systems, a live client deployment, computer vision, risk engineering, and security consulting."
         />
 
         {featured.map((project) => (
@@ -23,11 +23,18 @@ export default function Projects() {
         ))}
 
         <div className="grid gap-6 lg:grid-cols-2">
-          {rest.map((project, i) => (
-            <Reveal key={project.title} delay={i * 0.06} className="h-full min-w-0">
-              <ProjectCard project={project} />
-            </Reveal>
-          ))}
+          {rest.map((project, i) => {
+            const lastProject = i === rest.length - 1
+            return (
+              <Reveal
+                key={project.title}
+                delay={i * 0.06}
+                className={lastProject ? 'h-full min-w-0 lg:col-span-2' : 'h-full min-w-0'}
+              >
+                <ProjectCard project={project} wide={lastProject} />
+              </Reveal>
+            )
+          })}
         </div>
       </div>
     </section>

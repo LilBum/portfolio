@@ -34,7 +34,7 @@ The build is a fully static site (`dist/`), so any static host works.
 
 **After deploying:** keep the `og:url`, `og:image`, and `twitter:image` values in `index.html` aligned with the production URL. Social scrapers need absolute URLs.
 
-**Current production URL:** `https://alexub-portfolio.vercel.app`. If a custom domain is added later (e.g. alexanderursbadet.com), add it in the Vercel project first, then update the `canonical` + OG/Twitter + JSON-LD URLs in `index.html` and the URLs in `public/robots.txt` + `public/sitemap.xml` - do not point them at a domain that does not resolve yet.
+**Current production URL:** `https://alexub-portfolio.vercel.app`. If a custom domain is added later (e.g. `your-domain.example`), add it in the Vercel project first, then update the `canonical` + OG/Twitter + JSON-LD URLs in `index.html` and the URLs in `public/robots.txt` + `public/sitemap.xml` - do not point them at a domain that does not resolve yet.
 
 ## Notes
 

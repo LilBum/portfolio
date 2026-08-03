@@ -12,7 +12,7 @@ const strengths = [
   },
   {
     title: 'Systems that hold up',
-    copy: 'Risk engines, reverse-engineered network protocols, anti-exploit game systems, and security audits where correctness, reliability, and abuse cases matter.',
+    copy: 'Authentication, third-party integrations, risk engines, and security audits where correctness, reliability, and abuse cases matter.',
   },
 ];
 
@@ -23,15 +23,16 @@ export default function About() {
         <SectionHeading
           eyebrow="About"
           title="A production engineer with research-systems depth"
-          description="Full-stack delivery in regulated environments, with additional depth in computer vision, robotics, automation, and secure game systems."
+          description="Full-stack delivery in regulated environments, with additional depth in deployed client software, computer vision, robotics, automation, and secure systems."
         />
         <div className="grid gap-10 lg:grid-cols-[1.05fr_1fr] lg:items-start">
           <Reveal className="space-y-5 text-base leading-relaxed text-muted">
             <p>
               I&apos;m a full-stack software engineer who builds systems that
               need to work for real users, not just demos. At TSPi, I develop
-              Angular and AWS software for Farm Service Agency loan workflows
-              used by roughly 1,500 loan officers and applicants.
+              Angular and AWS software for Farm Service Agency loan workflows.
+              Independently, I&apos;ve shipped a modern product and a client site
+              from requirements through production.
             </p>
 
             <p>
@@ -47,18 +48,20 @@ export default function About() {
               I also build research and independent systems where the code has
               to answer to messy real-world inputs: cameras losing targets,
               robots needing stable control, trading systems requiring strict
-              risk limits, and a live game&apos;s binary protocol reconstructed
-              from captured traffic. That is the kind of engineering I enjoy
-              most, systems that have to hold up when conditions are imperfect.
+              risk limits, third-party integrations returning imperfect data,
+              and security reviews uncovering abuse cases. That is the kind of
+              engineering I enjoy most, systems that have to hold up when
+              conditions are imperfect.
             </p>
 
             <p>
               Lately that has spanned neuroscience and robotics software
-              (behavioral tracking, pose-estimation, robot control), an
-              options-trading bot built around a fail-closed risk engine, and a
-              reverse-engineered game server. I&apos;m especially interested in
-              software that connects production engineering, AI-adjacent tools,
-              and real-time systems.
+              (behavioral tracking, pose-estimation, robot control), a deployed
+              website for an operating care business, an options-trading bot
+              built around a fail-closed risk engine, and live-system security
+              remediation. I&apos;m especially interested in software that connects
+              production engineering, AI-assisted development workflows, and
+              real-time systems.
             </p>
           </Reveal>
 
