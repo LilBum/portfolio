@@ -26,5 +26,10 @@ dist-ssr
 # Retired assets + personal documents - never publish
 unused-assets/
 
-# Local AI-tooling telemetry - not part of the site
+# Local editor/tooling config - not part of the site
+.claude/
 weppy-project-sync/
+# Environment / secrets
+.env
+.env.*
+!.env.example

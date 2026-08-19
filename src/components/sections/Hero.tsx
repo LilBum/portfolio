@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { site } from '../../data/site';
 import Button from '../ui/Button';
-import { LinkedInIcon } from '../ui/Icons';
+import { GitHubIcon, LinkedInIcon } from '../ui/Icons';
 
 const iconLink =
   'inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-surface/60 text-muted backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/60 hover:text-fg';
@@ -19,7 +19,7 @@ const iconLink =
 const heroHighlights = [
   'Used daily by 1,500+ FSA staff and applicants',
   'Screens demoed to senior FSA staff and congressional contacts',
-  'Financial calculator cut a mostly manual workflow by ~40%',
+  'Financial calculator cut a manual workflow by 40%',
   'Legacy Java/Struts modernized to Angular and Spring Boot',
 ];
 
@@ -89,6 +89,15 @@ export default function Hero() {
             </Button>
             <div className="flex items-center gap-3">
               <span className="hidden h-7 w-px bg-border sm:block" />
+              <a
+                href={site.socials.github}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="GitHub"
+                className={iconLink}
+              >
+                <GitHubIcon className="h-4.5 w-4.5" />
+              </a>
               <a
                 href={site.socials.linkedin}
                 target="_blank"

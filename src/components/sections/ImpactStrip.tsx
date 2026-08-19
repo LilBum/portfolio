@@ -3,7 +3,7 @@ import { useInView } from 'framer-motion'
 import { impactStats } from '../../data/experience'
 import Reveal from '../ui/Reveal'
 
-/** Animates the numeric part of a stat (e.g. "1,500+" or "95-100%") from 0 once visible. */
+/** Animates the numeric part of a stat (e.g. "1,500+" or "98%") from 0 once visible. */
 function CountUp({ value }: { value: string }) {
   const match = value.match(/^([^\d]*)([\d,.]+)(.*)$/)
   const numericParts = value.match(/\d[\d,.]*/g) ?? []
@@ -48,7 +48,7 @@ function CountUp({ value }: { value: string }) {
 export default function ImpactStrip() {
   return (
     <section aria-label="Impact highlights" className="border-y border-border/70 bg-surface/55 px-6 py-10">
-      <div className="mx-auto grid max-w-6xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mx-auto grid max-w-6xl gap-4 sm:grid-cols-3">
         {impactStats.map((stat, i) => (
           <Reveal
             key={stat.label}

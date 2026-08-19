@@ -28,40 +28,28 @@ export default function About() {
         <div className="grid gap-10 lg:grid-cols-[1.05fr_1fr] lg:items-start">
           <Reveal className="space-y-5 text-base leading-relaxed text-muted">
             <p>
-              I&apos;m a full-stack software engineer who builds systems that
-              need to work for real users, not just demos. At TSPi, I develop
-              Angular and AWS software for Farm Service Agency loan workflows.
-              Independently, I&apos;ve shipped a modern product and a client site
-              from requirements through production.
-            </p>
-
-            <p>
-              Most of my professional work sits at the intersection of frontend
-              complexity, backend reliability, careful testing, and release
-              risk. I&apos;ve worked on financial calculators, legacy
+              At TSPi I write Angular and AWS software for USDA Farm Service
+              Agency loan programs. The work is financial calculators, legacy
               migrations, production forms, and federally regulated workflows
               where a small broken flow can become someone else&apos;s
               afternoon.
             </p>
 
             <p>
-              I also build research and independent systems where the code has
-              to answer to messy real-world inputs: cameras losing targets,
-              robots needing stable control, trading systems requiring strict
-              risk limits, third-party integrations returning imperfect data,
-              and security reviews uncovering abuse cases. That is the kind of
-              engineering I enjoy most, systems that have to hold up when
-              conditions are imperfect.
+              That constraint is what I like about it. Regulated software has
+              to be right the first time, so I spend most of my energy on the
+              parts that decide whether a release holds: validation rules,
+              role-dependent states, test coverage, and controlled rollout.
             </p>
 
             <p>
-              Lately that has spanned neuroscience and robotics software
-              (behavioral tracking, pose-estimation, robot control), a deployed
-              website for an operating care business, an options-trading bot
-              built around a fail-closed risk engine, and live-system security
-              remediation. I&apos;m especially interested in software that connects
-              production engineering, AI-assisted development workflows, and
-              real-time systems.
+              Outside work I build systems that answer to messy real-world
+              inputs, because that is the same problem in a different costume.
+              Cameras lose targets. Robots need stable control. Brokers
+              disconnect mid-trade. Third-party APIs return junk. I&apos;ve
+              shipped a live site for an operating care business, a real-time
+              tracking pipeline driving a mobile robot, and a trading system
+              designed to refuse to trade when it cannot prove it is safe.
             </p>
           </Reveal>
 

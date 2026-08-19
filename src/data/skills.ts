@@ -32,10 +32,8 @@ export const skillGroups: SkillGroup[] = [
     ],
   },
   {
-    label: 'AI-assisted engineering & delivery',
+    label: 'Engineering & delivery',
     items: [
-      'Claude Code',
-      'OpenAI Codex',
       'Git',
       'Code Review',
       'CI/CD',

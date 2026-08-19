@@ -1,7 +1,7 @@
 import { FileText, Mail, MapPin } from 'lucide-react';
 import Reveal from '../ui/Reveal';
 import Button from '../ui/Button';
-import { LinkedInIcon } from '../ui/Icons';
+import { GitHubIcon, LinkedInIcon } from '../ui/Icons';
 import { site } from '../../data/site';
 
 export default function Contact() {
@@ -45,6 +45,9 @@ export default function Contact() {
           </Button>
           <Button href={site.resumeUrl} variant="ghost" external>
             <FileText size={16} /> Resume
+          </Button>
+          <Button href={site.socials.github} variant="ghost" external>
+            <GitHubIcon className="h-4 w-4" /> GitHub
           </Button>
           <Button href={site.socials.linkedin} variant="ghost" external>
             <LinkedInIcon className="h-4 w-4" /> LinkedIn

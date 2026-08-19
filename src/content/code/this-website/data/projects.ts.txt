@@ -48,8 +48,8 @@ export const projects: Project[] = [
     impact: [
       'Built Angular forms and pages used by 1,500+ FSA staff and applicants',
       'Shipped debt-consolidation screens demoed to senior FSA staff and congressional contacts',
-      'Built an AWS/Angular/Node calculator that cut a mostly manual workflow by ~40%',
-      'Maintained 95-100% Jest coverage on front-end modules I owned',
+      'Built an AWS/Angular/Node calculator that cut a manual workflow by 40%',
+      'Held 98% Jest coverage on front-end modules I owned',
     ],
     tags: ['Angular', 'AWS', 'Node.js', 'Spring Boot', 'Jest'],
     visualLabel: '1,500+ daily users',

@@ -9,7 +9,7 @@ export default function Skills() {
         <SectionHeading
           eyebrow="Skills"
           title="The stack, end to end"
-          description="Production full-stack work with Angular, AWS, Node, testing, and AI-assisted engineering workflows using Claude Code and OpenAI Codex, backed by hands-on systems work in Python, computer vision, robotics, and application security."
+          description="Production full-stack work with Angular, AWS, Node, and testing, backed by hands-on systems work in Python, computer vision, robotics, and application security."
         />
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {skillGroups.map((group, i) => (

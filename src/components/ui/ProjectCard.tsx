@@ -256,15 +256,17 @@ export default function ProjectCard({ project, wide = false }: { project: Projec
             rel="noreferrer"
             className="inline-flex items-center gap-1 font-semibold text-muted transition-colors hover:text-fg"
           >
-            <Code size={16} /> Code
+            <Code size={16} /> {project.repoLabel ?? 'Code'}
           </a>
         )}
-        {!project.href && !project.repo && !project.caseStudy && (
-          <span className="font-mono text-xs text-muted">
-            {project.note ?? 'Private or client-facing work'}
-          </span>
-        )}
       </div>
+
+      {/* Access caveats are real but should never outrank the evidence above. */}
+      {project.note && (
+        <p className="mt-3 font-mono text-[11px] leading-relaxed text-muted/70">
+          {project.note}
+        </p>
+      )}
     </div>
   )
 

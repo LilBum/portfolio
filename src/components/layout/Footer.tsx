@@ -1,6 +1,6 @@
 import { Mail } from 'lucide-react'
 import { site } from '../../data/site'
-import { LinkedInIcon } from '../ui/Icons'
+import { GitHubIcon, LinkedInIcon } from '../ui/Icons'
 
 const iconLink =
   'inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-surface/60 text-muted transition-colors hover:border-accent/60 hover:text-fg'
@@ -16,6 +16,9 @@ export default function Footer() {
 
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
+            <a href={site.socials.github} target="_blank" rel="noreferrer" aria-label="GitHub" className={iconLink}>
+              <GitHubIcon className="h-4 w-4" />
+            </a>
             <a href={site.socials.linkedin} target="_blank" rel="noreferrer" aria-label="LinkedIn" className={iconLink}>
               <LinkedInIcon className="h-4 w-4" />
             </a>
