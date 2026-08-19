@@ -13,7 +13,7 @@ export default function Projects() {
         <SectionHeading
           eyebrow="Projects"
           title="Projects that left receipts"
-          description="Selected engineering work across regulated production software, private full-stack systems, a live client deployment, computer vision, risk engineering, and security consulting."
+          description="Production work first, then the independent systems. Where the code is private, the architecture and the reasoning are not."
         />
 
         {featured.map((project) => (

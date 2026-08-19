@@ -3,16 +3,16 @@ import SectionHeading from '../ui/SectionHeading';
 
 const strengths = [
   {
-    title: 'Production delivery',
-    copy: 'Angular, AWS, and Node systems in a regulated environment, with careful releases, high test coverage, and real users depending on the workflows.',
+    title: 'Regulated delivery',
+    copy: 'Angular and AWS loan workflows 1,500+ FSA staff use daily: role-dependent states, validation rules that answer to policy, and 98% Jest coverage on what I own.',
   },
   {
-    title: 'Research systems',
-    copy: 'Computer-vision tracking, pose estimation, and closed-loop robot control built for neuroscience and robotics workflows in lab settings.',
+    title: 'I design the bad path first',
+    copy: 'Brokers disconnect mid-order. Cameras lose the target. Clients lie. The interesting work is what the system does then, not on the happy path.',
   },
   {
-    title: 'Systems that hold up',
-    copy: 'Authentication, third-party integrations, risk engines, and security audits where correctness, reliability, and abuse cases matter.',
+    title: 'Whole systems, not tickets',
+    copy: 'Requirements to production: auth built from scratch, encrypted OAuth tokens, edge APIs, custom-domain launches. I ship the unglamorous parts too.',
   },
 ];
 
@@ -22,8 +22,8 @@ export default function About() {
       <div className="mx-auto max-w-6xl">
         <SectionHeading
           eyebrow="About"
-          title="A production engineer with research-systems depth"
-          description="Full-stack delivery in regulated environments, with additional depth in deployed client software, computer vision, robotics, automation, and secure systems."
+          title="A production engineer who works where mistakes are expensive"
+          description="Regulated federal loan software at work, and systems that have to survive messy inputs everywhere else."
         />
         <div className="grid gap-10 lg:grid-cols-[1.05fr_1fr] lg:items-start">
           <Reveal className="space-y-5 text-base leading-relaxed text-muted">

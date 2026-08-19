@@ -55,7 +55,7 @@ export default function Hero() {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-2 opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-accent-2" />
             </span>
-            Available for software engineering roles
+            Currently at TSPi · open to new roles
           </p>
 
           <h1 className="max-w-4xl text-balance font-display text-5xl font-bold leading-[1.04] tracking-tight text-fg sm:text-7xl lg:text-6xl xl:text-7xl">
