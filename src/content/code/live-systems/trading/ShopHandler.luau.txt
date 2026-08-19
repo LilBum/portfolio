@@ -1,0 +1,235 @@
+-- Shop purchases: egg gacha, gem upgrades, and area unlocks. All cost/currency
+-- checks are server-side; the client only requests.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local Modules = ReplicatedStorage.Modules
+local Multipliers = require(Modules.Multipliers)
+local QuestService = require(script.Parent.QuestService)
+local RarePullBroadcaster = require(script.Parent.RarePullBroadcaster)
+
+local rng = Random.new()
+
+-- Egg -> required unlocked zone. Unlisted eggs sell everywhere (Exclusive is Robux-gated upstream).
+local EGG_REQUIRED_ZONE = {
+	["Volcano Egg"] = 1,
+	["Water Egg"] = 2,
+	["Desert Egg"] = 3,
+	["Futuristic Egg"] = 4,
+	["Candy Egg"] = 5,
+	["Frozen Egg"] = 6,
+}
+local BROADCAST_RARITIES = { Epic = true, Legendary = true, Exclusive = true, Mythic = true }
+
+local function isReady(plr)
+	return plr and plr:FindFirstChild("Loaded") and plr.Loaded.Value
+end
+
+local function randomId(folder, reservedIds)
+	for _ = 1, 20 do
+		local id = tostring(rng:NextInteger(1, 1_000_000_000))
+		if not reservedIds[id] and not folder:FindFirstChild(id) then
+			reservedIds[id] = true
+			return id
+		end
+	end
+	error("[ShopHandler] failed to allocate pet id")
+end
+
+-- weighted roll; luck scales only the rarer tiers, never the common
+local function chooseRandomPet(egg, luck)
+	local pets, total = {}, 0
+	for _, pet in ReplicatedStorage.Eggs[egg].Pets:GetChildren() do
+		table.insert(pets, { pet.Name, pet.Value })
+	end
+	table.sort(pets, function(a, b)
+		return a[2] > b[2]
+	end)
+
+	for i, v in ipairs(pets) do
+		local weight = (i == 1) and v[2] or v[2] * luck
+		total += weight
+		v[2] = weight
+	end
+
+	if total <= 0 then
+		return nil
+	end
+
+	local roll = rng:NextNumber(0, total)
+	local counter = 0
+	for _, v in pets do
+		counter += v[2]
+		if counter >= roll then
+			return v[1]
+		end
+	end
+end
+
+-- Egg purchase -> returns a result table on success, or a string error code
+Remotes.Egg.OnServerInvoke = function(Player, Egg, Amount)
+	if not isReady(Player) then
+		return "not_loaded"
+	end
+	if Amount ~= 1 and Amount ~= 3 then
+		return "bad_amount"
+	end
+	if type(Egg) ~= "string" then
+		return "bad_egg"
+	end
+	if Player.NonSaveValues.IsOpeningEgg.Value then
+		return "opening"
+	end
+	if #Player.Data.Pets:GetChildren() + Amount > Multipliers.GetMaxPetsStorage(Player) then
+		return "storage_full"
+	end
+
+	local EggInfo = ReplicatedStorage.Eggs:FindFirstChild(Egg)
+	if not EggInfo then
+		return "no_egg"
+	end
+	if not EggInfo:FindFirstChild("Pets") or #EggInfo.Pets:GetChildren() == 0 then
+		return "empty_egg"
+	end
+	local hasPositiveWeight = false
+	for _, pet in EggInfo.Pets:GetChildren() do
+		if pet.Value > 0 then
+			hasPositiveWeight = true
+		end
+		if not ReplicatedStorage.Pets:FindFirstChild(pet.Name) then
+			return "missing_pet"
+		end
+	end
+	if not hasPositiveWeight then
+		return "empty_egg"
+	end
+	if EggInfo:FindFirstChild("ProductId") then
+		return "robux_egg"
+	end -- handled by ProcessReceipt
+
+	local requiredZone = EGG_REQUIRED_ZONE[Egg]
+	if requiredZone and Player.Data.PlayerData.BestZone.Value < requiredZone then
+		return "area_locked"
+	end
+	if Amount == 3 then
+		local triple = Player.Data.Gamepasses:FindFirstChild("TripleEgg")
+		if not triple or not triple.Value then
+			return "no_triple_pass"
+		end
+	end
+	if Player.Data.PlayerData.Currency.Value < EggInfo.Cost.Value * Amount then
+		return "no_currency"
+	end
+
+	local luck = Multipliers.GetLuckMultiplier(Player)
+	local reservedIds = {}
+	local Pending = {}
+	for i = 1, Amount do
+		local PetName = chooseRandomPet(Egg, luck)
+		if not PetName then
+			return "empty_egg"
+		end
+
+		local autoDelete = Player.Data.AutoDelete:FindFirstChild(PetName)
+		local petModel = ReplicatedStorage.Pets:FindFirstChild(PetName)
+		if not petModel then
+			return "missing_pet"
+		end
+
+		Pending[i] = {
+			name = PetName,
+			rarity = petModel.Settings.Rarity.Value,
+			id = if not autoDelete or not autoDelete.Value then randomId(Player.Data.Pets, reservedIds) else nil,
+		}
+	end
+
+	Player.Data.PlayerData.Currency.Value -= EggInfo.Cost.Value * Amount
+	Player.Data.PlayerData.EggsHatched.Value += Amount
+	Player.NonSaveValues.IsOpeningEgg.Value = true
+
+	-- auto-release the open lock even if the client crashes mid-hatch
+	task.spawn(function()
+		task.wait(3.5)
+		if Player and Player.Parent and Player:FindFirstChild("NonSaveValues") then
+			Player.NonSaveValues.IsOpeningEgg.Value = false
+		end
+	end)
+
+	local Results = {}
+	for i, result in Pending do
+		if result.id then
+			local NewPet = ReplicatedStorage.Assets.PetTemplate:Clone()
+			NewPet.Name = result.id
+			NewPet.PetName.Value = result.name
+			NewPet.Parent = Player.Data.Pets
+		end
+
+		if BROADCAST_RARITIES[result.rarity] then
+			RarePullBroadcaster.broadcast(Player, result.name, Egg, result.rarity)
+		end
+		QuestService.bump(Player, "hatch", 1)
+		if result.rarity ~= "Common" and result.rarity ~= "Uncommon" then
+			QuestService.bump(Player, "rareHatch", 1)
+		end
+		Results[i] = result.name
+	end
+	return Results
+end
+
+-- Area unlock: spend currency to advance to the next zone
+Remotes.Area.OnServerEvent:Connect(function(Player)
+	if not isReady(Player) then
+		return
+	end
+	local NextArea = ReplicatedStorage.Areas:FindFirstChild(tostring(Player.Data.PlayerData.BestZone.Value + 1))
+	if not NextArea then
+		return
+	end
+	if NextArea.Cost.Value == -1 then
+		return
+	end -- max area reached
+	if Player.Data.PlayerData.Currency.Value < NextArea.Cost.Value then
+		return
+	end
+
+	Player.Data.PlayerData.Currency.Value -= NextArea.Cost.Value
+	Player.Data.PlayerData.BestZone.Value = tonumber(NextArea.Name)
+end)
+
+-- Gem shop: tiered upgrades with linear or exponential pricing
+Remotes.GemUpgrade.OnServerEvent:Connect(function(Player, Upgrade)
+	if not isReady(Player) then
+		return
+	end
+	if type(Upgrade) ~= "string" then
+		return
+	end
+	if not ReplicatedStorage.GemShop:FindFirstChild(Upgrade) then
+		return
+	end
+
+	local GemUpg = ReplicatedStorage.GemShop[Upgrade]
+	local Tier = Player.Data.PlayerData["GemUpgrade" .. Upgrade]
+	if Tier.Value >= GemUpg.Max.Value then
+		return
+	end
+
+	local Cost = GemUpg.Price
+	local Price = if Cost.Exponential.Value
+		then Cost.DefaultPrice.Value * Cost.IncreasePer.Value ^ Tier.Value
+		else Cost.DefaultPrice.Value + Cost.IncreasePer.Value * (Tier.Value + 1)
+
+	if Player.Data.PlayerData.Currency2.Value < Price then
+		return
+	end
+	Player.Data.PlayerData.Currency2.Value -= Price
+	Tier.Value += 1
+
+	-- walkspeed upgrade applies immediately
+	if Upgrade == "1" and Player.Character then
+		local hum = Player.Character:FindFirstChildOfClass("Humanoid")
+		if hum then
+			hum.WalkSpeed = 16 + Tier.Value * 2
+		end
+	end
+end)

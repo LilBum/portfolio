@@ -28,6 +28,7 @@ const raw = import.meta.glob(
     './code/listing-studio/**/*.txt',
     './code/behavioral-tracking/**/*.txt',
     './code/pose-estimation/**/*.txt',
+    './code/live-systems/**/*.txt',
   ],
   {
   query: '?raw',

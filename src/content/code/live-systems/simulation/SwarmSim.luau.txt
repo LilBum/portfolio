@@ -1,0 +1,373 @@
+--!native
+-- Authority-agnostic, data-oriented ENEMY simulation (struct-of-arrays). No Instances in the
+-- hot path. step() moves every enemy toward the player and rebuilds the spatial hash, which
+-- projectiles and contact-damage then query.
+
+local SpatialHash = require(script.Parent.SpatialHash)
+
+local SwarmSim = {}
+SwarmSim.__index = SwarmSim
+
+local sqrt = math.sqrt
+local sin = math.sin
+local cos = math.cos
+
+-- typeConfig (optional): [typeId] = def with behavior fields: `standoff/retreat/fireCd/windup`
+-- makes a ranged stand-off shooter (fires via the fire queue), `weave/weaveHz` makes a flanker
+-- whose approach vector oscillates. Types without a config keep the plain chase.
+function SwarmSim.new(cellSize, maxEntities, contactRadius, flashTime, typeConfig)
+	return setmetatable({
+		count = 0,
+		max = maxEntities,
+		ex = table.create(maxEntities, 0),
+		ez = table.create(maxEntities, 0),
+		espeed = table.create(maxEntities, 0),
+		etype = table.create(maxEntities, 0),
+		ehp = table.create(maxEntities, 0),
+		econtact = table.create(maxEntities, 0),
+		esize = table.create(maxEntities, 0), -- per-entity render size override; 0 = use the type style
+		eid = table.create(maxEntities, 0), -- stable per-entity id (row indices reshuffle on swap-remove)
+		nextEid = 0,
+		eflash = table.create(maxEntities, 0), -- seconds of hit-flash left (client render reads this)
+		etele = table.create(maxEntities, 0), -- seconds of attack-telegraph left (own channel: must stay readable under hit-flash strobe)
+		efreeze = table.create(maxEntities, 0), -- seconds of freeze left (frozen enemies don't move)
+		eslow = table.create(maxEntities, 0), -- seconds of timed slow left (Pulsar; distinct from freeze)
+		ebehavTimer = table.create(maxEntities, 0), -- per-enemy behavior clock (shooter fire cooldown)
+		ephase = table.create(maxEntities, 0), -- per-enemy phase for weave desync
+		edmgAccum = table.create(maxEntities, 0), -- damage this frame, drained into one number per enemy
+		edmgPending = table.create(maxEntities, false),
+		edmgDirty = table.create(maxEntities, 0), -- indices of enemies with pending damage this frame
+		ecritFrame = table.create(maxEntities, false), -- a crit contributed to this frame's number (tints it)
+		dmgDirtyCount = 0,
+		flashTime = flashTime or 0,
+		typeConfig = typeConfig or {},
+		clock = 0,
+		fqx = table.create(16, 0), -- shooter fire queue (origins), drained by the orchestrator
+		fqz = table.create(16, 0),
+		fqt = table.create(16, 0), -- firing enemy's typeId (shot stats live on the enemy def)
+		fireCount = 0,
+		hash = SpatialHash.new(cellSize),
+		contactRadius2 = contactRadius * contactRadius,
+		_scratch = table.create(256, 0),
+	}, SwarmSim)
+end
+
+function SwarmSim:clear()
+	self.count = 0
+	self.dmgDirtyCount = 0
+	self.fireCount = 0
+	self.hash:clear()
+end
+
+function SwarmSim:spawn(x, z, typeId, hp, speed, contact, size)
+	local i = self.count + 1
+	if i > self.max then
+		return
+	end
+	self.count = i
+	self.ex[i] = x
+	self.ez[i] = z
+	self.etype[i] = typeId
+	self.ehp[i] = hp
+	self.espeed[i] = speed
+	self.econtact[i] = contact
+	self.esize[i] = size or 0
+	local eid = self.nextEid + 1
+	self.nextEid = eid
+	self.eid[i] = eid
+	self.eflash[i] = 0
+	self.etele[i] = 0
+	self.efreeze[i] = 0
+	self.eslow[i] = 0
+	self.ephase[i] = math.random() * 6.2831853
+	-- shooters stagger their first shot so a fresh wave doesn't volley in sync
+	local cfg = self.typeConfig[typeId]
+	self.ebehavTimer[i] = (cfg and cfg.fireCd) and cfg.fireCd * (0.5 + math.random() * 0.5) or 0
+	self.edmgAccum[i] = 0
+	self.edmgPending[i] = false
+	self.ecritFrame[i] = false
+end
+
+-- O(1) swap-remove: move the last row into slot i. (Damage accum/pending are drained to 0 before
+-- reap each frame, so only the behavior/render fields need to ride along with the moved row.)
+function SwarmSim:removeAt(i)
+	local c = self.count
+	if i ~= c then
+		self.ex[i] = self.ex[c]
+		self.ez[i] = self.ez[c]
+		self.etype[i] = self.etype[c]
+		self.ehp[i] = self.ehp[c]
+		self.espeed[i] = self.espeed[c]
+		self.econtact[i] = self.econtact[c]
+		self.esize[i] = self.esize[c]
+		self.eid[i] = self.eid[c]
+		self.eflash[i] = self.eflash[c]
+		self.etele[i] = self.etele[c]
+		self.efreeze[i] = self.efreeze[c]
+		self.eslow[i] = self.eslow[c]
+		self.ecritFrame[i] = self.ecritFrame[c]
+		self.ebehavTimer[i] = self.ebehavTimer[c]
+		self.ephase[i] = self.ephase[c]
+	end
+	self.count = c - 1
+end
+
+-- speedMult (optional, default 1) scales every enemy's chase speed this frame. The Singularity
+-- pull passes >1 with the cast point as the target so the whole field converges on it. Behavior
+-- branches (stand-off shooters, weavers) only run at mult==1, when (tx,tz) IS the player; during
+-- a pull everything plain-seeks the cast point.
+-- Slow zones (optional zoneX/zoneZ/zoneR2/zoneCount/zoneMult, Meadow Dewfall): enemies standing
+-- inside any zone move at zoneMult; the timed eslow field (Pulsar) stacks multiplicatively.
+function SwarmSim:step(dt, tx, tz, speedMult, zoneX, zoneZ, zoneR2, zoneCount, zoneMult)
+	local count = self.count
+	local ex, ez, espeed, eflash, efreeze = self.ex, self.ez, self.espeed, self.eflash, self.efreeze
+	local etype, ebehavTimer, ephase, etele = self.etype, self.ebehavTimer, self.ephase, self.etele
+	local eslow = self.eslow
+	local typeConfig = self.typeConfig
+	local mult = speedMult or 1
+	local plainOnly = mult ~= 1
+	local zcount = zoneCount or 0
+	local zmult = zoneMult or 0.6
+	local clock = self.clock + dt
+	self.clock = clock
+	local hash = self.hash
+	hash:clear()
+	for i = 1, count do
+		local x, z = ex[i], ez[i]
+		local fz = efreeze[i]
+		local cfg = if plainOnly then nil else typeConfig[etype[i]]
+		-- the slow timer decays wall-clock like every other status channel (even while frozen)
+		local sl = eslow[i]
+		if sl > 0 then
+			eslow[i] = sl - dt > 0 and sl - dt or 0
+		end
+		if fz > 0 then
+			efreeze[i] = fz - dt > 0 and fz - dt or 0
+		else
+			-- effective speed this frame: timed slow (Pulsar) and slow zones (Dewfall) stack
+			local spd = espeed[i]
+			if sl > 0 then
+				spd *= 0.6
+			end
+			for zi = 1, zcount do
+				local zdx = x - zoneX[zi]
+				local zdz = z - zoneZ[zi]
+				if zdx * zdx + zdz * zdz <= zoneR2[zi] then
+					spd *= zmult
+					break
+				end
+			end
+			if cfg == nil then
+				local dx = tx - x
+				local dz = tz - z
+				local d = sqrt(dx * dx + dz * dz)
+				if d > 0.001 then
+					local s = spd * mult * dt / d
+					x += dx * s
+					z += dz * s
+					ex[i] = x
+					ez[i] = z
+				end
+			elseif cfg.standoff then
+				-- stand-off shooter: advance to the band, back off when crowded, fire on a timer.
+				-- ephase gives each a personal hold distance so some drift into melee/blade range
+				-- instead of the whole pack parking at one sterile ring (also keeps Halo-only
+				-- starts from facing a strictly unreachable band).
+				local dx = tx - x
+				local dz = tz - z
+				local d = sqrt(dx * dx + dz * dz)
+				local hold = cfg.retreat * (0.6 + 0.4 * ephase[i] * 0.15915494)
+				if d > cfg.standoff then
+					local s = spd * dt / d
+					x += dx * s
+					z += dz * s
+					ex[i] = x
+					ez[i] = z
+				elseif d > hold + 2 then
+					local s = spd * 0.3 * dt / d
+					x += dx * s
+					z += dz * s
+					ex[i] = x
+					ez[i] = z
+				elseif d < hold - 2 and d > 0.001 then
+					local s = spd * 0.8 * dt / d
+					x -= dx * s
+					z -= dz * s
+					ex[i] = x
+					ez[i] = z
+				end
+				if d <= cfg.standoff + 8 then
+					local t = ebehavTimer[i] - dt
+					if t <= cfg.windup then
+						etele[i] = 0.1 -- wind-up telegraph: held above the 0.05 dt clamp so the same-frame decay can't zero it
+					end
+					if t <= 0 then
+						t = cfg.fireCd
+						local q = self.fireCount
+						if q < 16 then
+							q += 1
+							self.fireCount = q
+							self.fqx[q] = x
+							self.fqz[q] = z
+							self.fqt[q] = etype[i]
+						end
+					end
+					ebehavTimer[i] = t
+				end
+			else
+				-- weaver: approach vector oscillates so the horde flanks in arcs
+				local dx = tx - x
+				local dz = tz - z
+				local d = sqrt(dx * dx + dz * dz)
+				if d > 0.001 then
+					local a = sin(clock * cfg.weaveHz * 6.2831853 + ephase[i]) * cfg.weave
+					local ca, sa = cos(a), sin(a)
+					local ndx = dx * ca - dz * sa
+					local ndz = dx * sa + dz * ca
+					local s = spd * dt / d
+					x += ndx * s
+					z += ndz * s
+					ex[i] = x
+					ez[i] = z
+				end
+			end
+		end
+		local f = eflash[i]
+		if f > 0 then
+			f -= dt
+			eflash[i] = f > 0 and f or 0
+		end
+		local te = etele[i]
+		if te > 0 then
+			te -= dt
+			etele[i] = te > 0 and te or 0
+		end
+		hash:insert(i, x, z)
+	end
+end
+
+-- Freeze enemy i in place for at least `seconds` (does not stack, takes the longer remaining time).
+function SwarmSim:freeze(i, seconds)
+	if self.efreeze[i] < seconds then
+		self.efreeze[i] = seconds
+	end
+end
+
+-- Slow enemy i to 60% speed for at least `seconds` (same longer-wins rule as freeze).
+function SwarmSim:slow(i, seconds)
+	if self.eslow[i] < seconds then
+		self.eslow[i] = seconds
+	end
+end
+
+-- Discrete hit (projectile / nova / chain): reduces HP, triggers the white flash, and accumulates
+-- damage for one aggregated floating number per enemy per frame. Returns true if it died.
+function SwarmSim:damage(i, dmg, crit)
+	local hp = self.ehp[i] - dmg
+	self.ehp[i] = hp
+	self.eflash[i] = self.flashTime
+	if not self.edmgPending[i] then
+		self.edmgPending[i] = true
+		local c = self.dmgDirtyCount + 1
+		self.dmgDirtyCount = c
+		self.edmgDirty[c] = i
+	end
+	self.edmgAccum[i] += dmg
+	if crit then
+		self.ecritFrame[i] = true -- sticky for the frame: any crit tints the aggregated number
+	end
+	return hp <= 0
+end
+
+-- Continuous damage (orbit blades): reduces HP only, with no flash strobe or per-frame number spam.
+function SwarmSim:damageTick(i, dmg)
+	local hp = self.ehp[i] - dmg
+	self.ehp[i] = hp
+	return hp <= 0
+end
+
+-- Emit one aggregated number per enemy damaged this frame, then reset the accumulator. Must run
+-- after all damage and BEFORE reap (indices are stable in that window).
+function SwarmSim:drainDamage(emit)
+	local dirty, accum, pending = self.edmgDirty, self.edmgAccum, self.edmgPending
+	local ecrit = self.ecritFrame
+	local ex, ez = self.ex, self.ez
+	for k = 1, self.dmgDirtyCount do
+		local i = dirty[k]
+		emit(ex[i], ez[i], accum[i], ecrit[i])
+		accum[i] = 0
+		pending[i] = false
+		ecrit[i] = false
+	end
+	self.dmgDirtyCount = 0
+end
+
+-- Clear all hit-flashes and telegraphs (called when a draft pauses, so enemies don't freeze mid-flash).
+function SwarmSim:clearFlashes()
+	local eflash, etele = self.eflash, self.etele
+	for i = 1, self.count do
+		eflash[i] = 0
+		etele[i] = 0
+	end
+end
+
+-- Sum of contact DPS (scaled by dt) for enemies within contact radius of the player.
+function SwarmSim:contactDamage(px, pz, dt)
+	local scratch = self._scratch
+	local n = self.hash:queryInto(px, pz, scratch)
+	local r2 = self.contactRadius2
+	local ex, ez, econtact = self.ex, self.ez, self.econtact
+	local total = 0
+	for j = 1, n do
+		local id = scratch[j]
+		local dx = ex[id] - px
+		local dz = ez[id] - pz
+		if dx * dx + dz * dz <= r2 then
+			total += econtact[id] * dt
+		end
+	end
+	return total
+end
+
+-- Nearest enemy to (px,pz); returns index or -1. Linear scan (cheap; called on weapon fire).
+function SwarmSim:nearest(px, pz)
+	local count = self.count
+	local ex, ez = self.ex, self.ez
+	local best, bestD = -1, math.huge
+	for i = 1, count do
+		local dx = ex[i] - px
+		local dz = ez[i] - pz
+		local d = dx * dx + dz * dz
+		if d < bestD then
+			bestD = d
+			best = i
+		end
+	end
+	return best
+end
+
+-- Current HP and index of the first live enemy of typeId (e.g. the single boss); -1 if none.
+-- Callers must re-find every frame: swap-remove invalidates stored indices.
+function SwarmSim:findType(typeId)
+	local etype, ehp = self.etype, self.ehp
+	for i = 1, self.count do
+		if etype[i] == typeId then
+			return ehp[i], i
+		end
+	end
+	return -1, -1
+end
+
+-- Remove dead enemies (hp <= 0), calling onDeath(x, z, typeId) for each.
+function SwarmSim:reap(onDeath)
+	local i = self.count
+	while i >= 1 do
+		if self.ehp[i] <= 0 then
+			onDeath(self.ex[i], self.ez[i], self.etype[i])
+			self:removeAt(i)
+		end
+		i -= 1
+	end
+end
+
+return SwarmSim

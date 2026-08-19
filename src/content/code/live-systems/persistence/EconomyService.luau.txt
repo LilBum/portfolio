@@ -1,0 +1,760 @@
+--!nonstrict
+
+local Players = game:GetService("Players")
+local DataStoreService = game:GetService("DataStoreService")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+
+local Heartbeat = RunService.Heartbeat
+local rng = Random.new()
+
+local Config: any = {
+	DataVersion = 1,
+	StoreName = "PlayerEconomy_v1",
+	KeyPrefix = "u_",
+
+	StartingCurrency = 0,
+
+	MaxCurrency = 1e15,
+	MaxLifetimeCurrency = 9e15,
+	MaxGeneratorCount = 10000,
+	MaxIncomePerSecond = 1e12,
+
+	StaleLockSeconds = 180,
+	LoadAttempts = 5,
+	SaveAttempts = 4,
+	BackoffBase = 2,
+	BackoffCap = 30,
+
+	ReleaseSaveAttempts = 3,
+	ReleaseBackoff = 1,
+
+	AutosaveSeconds = 60,
+	AutosaveStagger = 0.1,
+	ShutdownBudget = 25,
+
+	SaveAwaitSeconds = 10,
+
+	MaxFrameDt = 1,
+	MaxOfflineSeconds = 8 * 3600,
+	OfflineEfficiency = 0.5,
+
+	Generators = {
+		miner = { baseRate = 0.5, baseCost = 15, growth = 1.15 },
+		drill = { baseRate = 4, baseCost = 200, growth = 1.18 },
+		refinery = { baseRate = 30, baseCost = 3000, growth = 1.22 },
+		reactor = { baseRate = 260, baseCost = 50000, growth = 1.27 },
+	},
+
+	Upgrades = {
+		doubleRate = { cost = 5000, rateMul = 2 },
+		sharperBits = { cost = 1200, rateMul = 2, rateTarget = "miner" },
+		cheaperDrills = { cost = 2500, costMul = 0.9, costTargets = { miner = true, drill = true } },
+		prereq = nil,
+	},
+
+	Prestige = {
+		minCurrency = 1e6,
+		divisor = 1e6,
+		perPoint = 0.02,
+		maxClaimable = 1e6,
+	},
+}
+
+local store: any
+local jobId = game.JobId
+local Profiles: { [Player]: any } = {}
+local ActiveUsers: { [number]: Player } = {}
+local LoadingUsers: { [number]: string } = {}
+local Saving: { [Player]: number } = {}
+local ReleaseRequested: { [Player]: boolean } = {}
+local OfflineGains: { [Player]: number } = {}
+local initialized = false
+local shuttingDown = false
+local autosaveInProgress = false
+
+local function deepCopy(t: any): any
+	if type(t) ~= "table" then
+		return t
+	end
+	local out: any = {}
+	for k, v in t do
+		out[k] = deepCopy(v)
+	end
+	return out
+end
+
+local function safeNumber(v: any, default: number): number
+	if type(v) ~= "number" or v ~= v or v == math.huge or v == -math.huge then
+		return default
+	end
+	return v
+end
+
+local function clampNumber(v: any, default: number, minValue: number, maxValue: number): number
+	local n = safeNumber(v, default)
+	if n < minValue then
+		return minValue
+	end
+	if n > maxValue then
+		return maxValue
+	end
+	return n
+end
+
+local function clampInteger(v: any, default: number, minValue: number, maxValue: number): number
+	return math.floor(clampNumber(v, default, minValue, maxValue))
+end
+
+local function logWarn(message: string, ...)
+	warn(string.format("[EconomyService] " .. message, ...))
+end
+
+local function keyFor(player: Player): string
+	return Config.KeyPrefix .. player.UserId
+end
+
+-- Builds a clean starting profile.
+local function defaultProfile(): any
+	local generators: { [string]: number } = {}
+	for id in Config.Generators do
+		generators[id] = 0
+	end
+	local upgrades: { [string]: boolean } = {}
+	for id, def in Config.Upgrades do
+		if type(def) == "table" then
+			upgrades[id] = false
+		end
+	end
+	return {
+		version = Config.DataVersion,
+		currency = Config.StartingCurrency,
+		lifetimeCurrency = 0,
+		generators = generators,
+		upgrades = upgrades,
+		prestige = { points = 0, claimedLifetime = 0 },
+		prestigeMult = 1,
+		lastSeen = os.time(),
+		lock = nil,
+	}
+end
+
+-- Calculates the prestige income multiplier.
+local function prestigeMultiplier(p: any): number
+	local points = 0
+	if type(p.prestige) == "table" then
+		points = clampInteger(p.prestige.points, 0, 0, Config.Prestige.maxClaimable)
+	end
+	return 1 + points * Config.Prestige.perPoint
+end
+
+-- Calculates total earned prestige points.
+local function entitledPoints(lifetime: number): number
+	local safeLifetime = clampNumber(lifetime, 0, 0, Config.MaxLifetimeCurrency)
+	return math.min(Config.Prestige.maxClaimable, math.floor(math.sqrt(safeLifetime / Config.Prestige.divisor)))
+end
+
+-- Sanitizes loaded profile data.
+local function reconcile(p: any): any
+	if type(p) ~= "table" then
+		logWarn("Replacing malformed profile record")
+		p = defaultProfile()
+	end
+
+	local out = defaultProfile()
+	local sourceGenerators = if type(p.generators) == "table" then p.generators else {}
+	for id in Config.Generators do
+		out.generators[id] = clampInteger(sourceGenerators[id], 0, 0, Config.MaxGeneratorCount)
+	end
+
+	local sourceUpgrades = if type(p.upgrades) == "table" then p.upgrades else {}
+	for id, def in Config.Upgrades do
+		if type(def) == "table" then
+			out.upgrades[id] = sourceUpgrades[id] == true
+		end
+	end
+
+	local sourcePrestige = if type(p.prestige) == "table" then p.prestige else {}
+	out.currency = clampNumber(p.currency, Config.StartingCurrency, 0, Config.MaxCurrency)
+	out.lifetimeCurrency = clampNumber(p.lifetimeCurrency, 0, 0, Config.MaxLifetimeCurrency)
+	out.prestige.points = clampInteger(sourcePrestige.points, 0, 0, Config.Prestige.maxClaimable)
+	out.prestige.claimedLifetime = clampNumber(sourcePrestige.claimedLifetime, 0, 0, Config.MaxLifetimeCurrency)
+	out.prestige.claimedLifetime = math.min(out.prestige.claimedLifetime, out.lifetimeCurrency)
+	out.lastSeen = clampInteger(p.lastSeen, os.time(), 0, os.time() + Config.MaxOfflineSeconds)
+	out.prestigeMult = prestigeMultiplier(out)
+	out.version = Config.DataVersion
+	out.lock = if type(p.lock) == "table" then p.lock else nil
+	return out
+end
+
+-- Calculates income per second.
+local function computeRate(p: any): number
+	local total = 0
+	for id, count in p.generators do
+		local def = Config.Generators[id]
+		local safeCount = clampInteger(count, 0, 0, Config.MaxGeneratorCount)
+		if def and safeCount > 0 then
+			local perUnit = def.baseRate
+			for upId, owned in p.upgrades do
+				if owned then
+					local up = Config.Upgrades[upId]
+					if up and up.rateMul then
+						local target = up.rateTarget
+						if target == nil or target == id then
+							perUnit *= up.rateMul
+						end
+					end
+				end
+			end
+			total = clampNumber(total + perUnit * safeCount, 0, 0, Config.MaxIncomePerSecond)
+		end
+	end
+	return clampNumber(total * prestigeMultiplier(p), 0, 0, Config.MaxIncomePerSecond)
+end
+
+-- Refreshes the cached income rate.
+local function refreshRate(p: any)
+	p._rate = computeRate(p)
+end
+
+-- Adds clamped currency and lifetime currency.
+local function addCurrency(p: any, amount: number)
+	local gain = clampNumber(amount, 0, 0, Config.MaxCurrency)
+	if gain <= 0 then
+		return
+	end
+	p.currency = clampNumber(safeNumber(p.currency, 0) + gain, 0, 0, Config.MaxCurrency)
+	p.lifetimeCurrency = clampNumber(safeNumber(p.lifetimeCurrency, 0) + gain, 0, 0, Config.MaxLifetimeCurrency)
+end
+
+-- Calculates the next generator cost.
+local function genCost(p: any, id: string): number
+	local def = Config.Generators[id]
+	if not def then
+		return math.huge
+	end
+	local owned = clampInteger(p.generators[id], 0, 0, Config.MaxGeneratorCount)
+	if owned >= Config.MaxGeneratorCount then
+		return math.huge
+	end
+	local costMul = 1
+	for upId, taken in p.upgrades do
+		if taken then
+			local up = Config.Upgrades[upId]
+			if up and up.costMul and up.costTargets and up.costTargets[id] then
+				costMul *= up.costMul
+			end
+		end
+	end
+	local cost = def.baseCost * (def.growth ^ owned) * costMul
+	if cost ~= cost or cost == math.huge or cost > Config.MaxCurrency then
+		return math.huge
+	end
+	return math.floor(math.max(0, cost))
+end
+
+local function backoff(attempt: number): number
+	local d = math.min(Config.BackoffCap, Config.BackoffBase * 2 ^ (attempt - 1))
+	return d + rng:NextNumber() * 0.5
+end
+
+local function ownsLock(lock: any, sessionId: string): boolean
+	return type(lock) == "table" and lock.jobId == jobId and lock.sessionId == sessionId
+end
+
+local function liveForeignLock(lock: any, sessionId: string): boolean
+	if type(lock) ~= "table" then
+		return false
+	end
+	local lockJobId = lock.jobId
+	if type(lockJobId) ~= "string" then
+		return false
+	end
+	if lockJobId == jobId and lock.sessionId == sessionId then
+		return false
+	end
+	local lockTime = safeNumber(lock.t, 0)
+	return (os.time() - lockTime) < Config.StaleLockSeconds
+end
+
+local function releaseOwnedLock(player: Player, sessionId: string)
+	local key = keyFor(player)
+	local ok, err = pcall(function()
+		store:UpdateAsync(key, function(stored)
+			if type(stored) ~= "table" then
+				return nil
+			end
+			if ownsLock(stored.lock, sessionId) then
+				local out = deepCopy(stored)
+				out.lock = nil
+				return out
+			end
+			return nil
+		end)
+	end)
+	if not ok then
+		logWarn("Failed to release owned lock for %d: %s", player.UserId, tostring(err))
+	end
+end
+
+-- Loads and locks a player profile.
+local function loadProfile(player: Player, sessionId: string): any?
+	local key = keyFor(player)
+	local blockedByLock = false
+	local lastErr: any = nil
+	for attempt = 1, Config.LoadAttempts do
+		if shuttingDown then
+			return nil
+		end
+		local acquired = false
+		blockedByLock = false
+		local ok, resultOrErr = pcall(function()
+			return store:UpdateAsync(key, function(stored)
+				local rec: any
+				if type(stored) == "table" then
+					rec = stored
+				else
+					if stored ~= nil then
+						logWarn("Replacing malformed stored profile for %d", player.UserId)
+					end
+					rec = defaultProfile()
+				end
+
+				if liveForeignLock(rec.lock, sessionId) then
+					blockedByLock = true
+					return nil
+				end
+				rec.lock = { jobId = jobId, sessionId = sessionId, t = os.time() }
+				acquired = true
+				return rec
+			end)
+		end)
+		if ok and acquired and resultOrErr ~= nil then
+			local recOk, profile = pcall(reconcile, resultOrErr)
+			if recOk then
+				profile._sessionId = sessionId
+				return profile
+			end
+			logWarn("Reconcile failed for %d after lock acquisition: %s", player.UserId, tostring(profile))
+			releaseOwnedLock(player, sessionId)
+			return nil
+		end
+		if not ok then
+			lastErr = resultOrErr
+			logWarn("Load attempt %d/%d failed for %d: %s", attempt, Config.LoadAttempts, player.UserId, tostring(resultOrErr))
+		end
+		task.wait(backoff(attempt))
+	end
+	if blockedByLock then
+		logWarn("Could not acquire live profile lock for %d after %d attempts", player.UserId, Config.LoadAttempts)
+	else
+		logWarn("Could not load profile for %d after %d attempts: %s", player.UserId, Config.LoadAttempts, tostring(lastErr))
+	end
+	return nil
+end
+
+-- Saves a profile and optionally releases its lock.
+local function savePlayer(player: Player, release: boolean, mustSave: boolean?): boolean
+	local p = Profiles[player]
+	if not p then
+		return true
+	end
+	local sessionId = p._sessionId
+	if type(sessionId) ~= "string" then
+		logWarn("Refusing to save %d without a profile session id", player.UserId)
+		return false
+	end
+	if release then
+		ReleaseRequested[player] = true
+	end
+	if (Saving[player] or 0) > 0 then
+		if not release and not mustSave then
+			return true
+		end
+		local deadline = os.clock() + Config.SaveAwaitSeconds
+		while (Saving[player] or 0) > 0 and os.clock() < deadline do
+			task.wait()
+		end
+		if (Saving[player] or 0) > 0 then
+			logWarn("Save for %d is overlapping %d in-flight save(s) (release=%s)", player.UserId, Saving[player] or 0, tostring(release))
+		end
+		p = Profiles[player]
+		if not p then
+			return true
+		end
+		sessionId = p._sessionId
+		if type(sessionId) ~= "string" then
+			logWarn("Refusing to save %d without a profile session id after await", player.UserId)
+			return false
+		end
+	end
+
+	Saving[player] = (Saving[player] or 0) + 1
+	local key = keyFor(player)
+	local attempts = release and Config.ReleaseSaveAttempts or Config.SaveAttempts
+	local saved = false
+	local lost = false
+	local releasedElsewhere = false
+	local lastErr: any = nil
+	for attempt = 1, attempts do
+		p.lastSeen = os.time()
+		local ok, err = pcall(function()
+			store:UpdateAsync(key, function(stored)
+				local lock = if type(stored) == "table" then stored.lock else nil
+				if liveForeignLock(lock, sessionId) then
+					lost = true
+					return nil
+				end
+
+				local shouldRelease = release or ReleaseRequested[player] == true
+				if not ownsLock(lock, sessionId) then
+					if shouldRelease and lock == nil then
+						releasedElsewhere = true
+						return nil
+					end
+					lost = true
+					return nil
+				end
+
+				local out = reconcile(deepCopy(p))
+				out._rate = nil
+				out._sessionId = nil
+				if shouldRelease then
+					out.lock = nil
+				else
+					out.lock = { jobId = jobId, sessionId = sessionId, t = os.time() }
+				end
+				return out
+			end)
+		end)
+		if ok and releasedElsewhere then
+			saved = true
+			break
+		end
+		if lost then
+			logWarn("Profile lock lost for %d during save; dropping live profile", player.UserId)
+			Profiles[player] = nil
+			if ActiveUsers[player.UserId] == player then
+				ActiveUsers[player.UserId] = nil
+			end
+			if player:IsDescendantOf(Players) then
+				player:Kick("Your data was opened in another server. Please rejoin.")
+			end
+			break
+		end
+		if ok then
+			saved = true
+			break
+		end
+		lastErr = err
+		logWarn("Save attempt %d/%d failed for %d (release=%s): %s", attempt, attempts, player.UserId, tostring(release), tostring(err))
+		task.wait(release and Config.ReleaseBackoff or backoff(attempt))
+	end
+
+	local remaining = (Saving[player] or 1) - 1
+	if remaining > 0 then
+		Saving[player] = remaining
+	else
+		Saving[player] = nil
+		if ReleaseRequested[player] then
+			ReleaseRequested[player] = nil
+		end
+	end
+	if not saved and not lost then
+		logWarn("Save exhausted for %d (release=%s): %s", player.UserId, tostring(release), tostring(lastErr))
+	end
+	return saved and not lost
+end
+
+-- Grants capped offline income.
+local function grantOffline(p: any): number
+	local now = os.time()
+	local elapsed = now - safeNumber(p.lastSeen, now)
+	if elapsed < 0 then
+		elapsed = 0
+	end
+	local capped = math.min(elapsed, Config.MaxOfflineSeconds)
+	local earned = clampNumber(computeRate(p) * capped * Config.OfflineEfficiency, 0, 0, Config.MaxCurrency)
+	addCurrency(p, earned)
+	p.lastSeen = now
+	return earned
+end
+
+-- Clears transient player state.
+local function clearUserState(player: Player, loadToken: string?)
+	Profiles[player] = nil
+	if ActiveUsers[player.UserId] == player then
+		ActiveUsers[player.UserId] = nil
+	end
+	if loadToken ~= nil and LoadingUsers[player.UserId] == loadToken then
+		LoadingUsers[player.UserId] = nil
+	end
+	OfflineGains[player] = nil
+end
+
+-- Clears the active loading token.
+local function clearLoadingToken(player: Player, loadToken: string)
+	if LoadingUsers[player.UserId] == loadToken then
+		LoadingUsers[player.UserId] = nil
+	end
+end
+
+-- Handles profile load on join.
+local function onPlayerAdded(player: Player)
+	if shuttingDown then
+		player:Kick("Server is shutting down. Please rejoin.")
+		return
+	end
+	if Profiles[player] then
+		return
+	end
+	local active = ActiveUsers[player.UserId]
+	local loadingToken = LoadingUsers[player.UserId]
+	if (active and active ~= player and active:IsDescendantOf(Players)) or loadingToken ~= nil then
+		player:Kick("Your data is already loading on this server. Please rejoin.")
+		return
+	end
+
+	local loadToken = HttpService:GenerateGUID(false)
+	LoadingUsers[player.UserId] = loadToken
+	local p = loadProfile(player, loadToken)
+	if LoadingUsers[player.UserId] ~= loadToken then
+		if p then
+			releaseOwnedLock(player, loadToken)
+		end
+		return
+	end
+	if not p then
+		clearUserState(player, loadToken)
+		player:Kick("Could not load your data (session is loading elsewhere). Please rejoin.")
+		return
+	end
+	if shuttingDown or not player:IsDescendantOf(Players) then
+		releaseOwnedLock(player, loadToken)
+		clearUserState(player, loadToken)
+		return
+	end
+
+	local gain = grantOffline(p)
+	refreshRate(p)
+	OfflineGains[player] = gain
+	Profiles[player] = p
+	ActiveUsers[player.UserId] = player
+
+	if not savePlayer(player, false, true) then
+		savePlayer(player, true, true)
+		clearUserState(player, loadToken)
+		if player:IsDescendantOf(Players) then
+			player:Kick("Could not save your data. Please rejoin.")
+		end
+		return
+	end
+	clearLoadingToken(player, loadToken)
+end
+
+-- Handles profile save on leave.
+local function onPlayerRemoving(player: Player)
+	savePlayer(player, true, true)
+	clearUserState(player, nil)
+end
+
+-- Starts passive income and autosave.
+local function startLoop()
+	local sinceSave = 0
+	Heartbeat:Connect(function(dt)
+		if dt > Config.MaxFrameDt then
+			dt = Config.MaxFrameDt
+		end
+		for _, p in Profiles do
+			addCurrency(p, (p._rate or 0) * dt)
+		end
+		sinceSave += dt
+		if sinceSave >= Config.AutosaveSeconds then
+			sinceSave = 0
+			if not autosaveInProgress then
+				autosaveInProgress = true
+				task.spawn(function()
+					local ok, err = pcall(function()
+						for _, player in Players:GetPlayers() do
+							if Profiles[player] then
+								task.spawn(function()
+									local saveOk, saveErr = pcall(savePlayer, player, false, false)
+									if not saveOk then
+										logWarn("Autosave task failed for %d: %s", player.UserId, tostring(saveErr))
+									end
+								end)
+								task.wait(Config.AutosaveStagger)
+							end
+						end
+					end)
+					autosaveInProgress = false
+					if not ok then
+						logWarn("Autosave cycle error: %s", tostring(err))
+					end
+				end)
+			end
+		end
+	end)
+end
+
+-- Saves live profiles during shutdown.
+local function onClose()
+	shuttingDown = true
+	local pending = 0
+	for player in Profiles do
+		pending += 1
+		task.spawn(function()
+			local ok, err = pcall(savePlayer, player, true, true)
+			if not ok then
+				logWarn("Release save task failed for %d: %s", player.UserId, tostring(err))
+			end
+			pending -= 1
+		end)
+	end
+	local deadline = os.clock() + Config.ShutdownBudget
+	while pending > 0 and os.clock() < deadline do
+		task.wait()
+	end
+	if pending > 0 then
+		logWarn("Shutdown budget expired with %d release save(s) still pending", pending)
+	end
+end
+
+local EconomyService = {}
+
+-- Initializes the economy service.
+function EconomyService.Init()
+	if initialized then
+		return
+	end
+	initialized = true
+	if jobId == "" then
+		jobId = "studio_" .. HttpService:GenerateGUID(false)
+	end
+	store = DataStoreService:GetDataStore(Config.StoreName)
+	Players.PlayerAdded:Connect(onPlayerAdded)
+	Players.PlayerRemoving:Connect(onPlayerRemoving)
+	for _, player in Players:GetPlayers() do
+		task.spawn(onPlayerAdded, player)
+	end
+	startLoop()
+	game:BindToClose(onClose)
+end
+
+-- Returns a profile snapshot.
+function EconomyService.GetProfile(player: Player): any?
+	local p = Profiles[player]
+	if not p then
+		return nil
+	end
+	local copy = deepCopy(p)
+	copy._rate = nil
+	copy._sessionId = nil
+	copy.lock = nil
+	return copy
+end
+
+-- Returns current currency.
+function EconomyService.GetCurrency(player: Player): number
+	local p = Profiles[player]
+	return p and math.floor(clampNumber(p.currency, 0, 0, Config.MaxCurrency)) or 0
+end
+
+-- Returns current income rate.
+function EconomyService.GetIncomePerSecond(player: Player): number
+	local p = Profiles[player]
+	return p and clampNumber(p._rate, 0, 0, Config.MaxIncomePerSecond) or 0
+end
+
+-- Returns the last offline gain.
+function EconomyService.GetOfflineGain(player: Player): number
+	return math.floor(clampNumber(OfflineGains[player], 0, 0, Config.MaxCurrency))
+end
+
+-- Buys a generator.
+function EconomyService.PurchaseGenerator(player: Player, id: string): (boolean, string?)
+	local p = Profiles[player]
+	if not p or shuttingDown then
+		return false, "unavailable"
+	end
+	if not Config.Generators[id] then
+		return false, "bad_id"
+	end
+	if clampInteger(p.generators[id], 0, 0, Config.MaxGeneratorCount) >= Config.MaxGeneratorCount then
+		return false, "maxed"
+	end
+	p.currency = clampNumber(p.currency, 0, 0, Config.MaxCurrency)
+	local cost = genCost(p, id)
+	if cost ~= cost or cost == math.huge or p.currency < cost then
+		return false, "insufficient"
+	end
+	p.currency = clampNumber(p.currency - cost, 0, 0, Config.MaxCurrency)
+	p.generators[id] = clampInteger((p.generators[id] or 0) + 1, 0, 0, Config.MaxGeneratorCount)
+	refreshRate(p)
+	return true
+end
+
+-- Buys an upgrade.
+function EconomyService.PurchaseUpgrade(player: Player, id: string): (boolean, string?)
+	local p = Profiles[player]
+	if not p or shuttingDown then
+		return false, "unavailable"
+	end
+	local def = Config.Upgrades[id]
+	if type(def) ~= "table" then
+		return false, "bad_id"
+	end
+	if p.upgrades[id] then
+		return false, "owned"
+	end
+	if def.prereq and not p.upgrades[def.prereq] then
+		return false, "prereq"
+	end
+	p.currency = clampNumber(p.currency, 0, 0, Config.MaxCurrency)
+	local cost = safeNumber(def.cost, math.huge)
+	if cost == math.huge or cost < 0 or p.currency < cost then
+		return false, "insufficient"
+	end
+	p.currency = clampNumber(p.currency - cost, 0, 0, Config.MaxCurrency)
+	p.upgrades[id] = true
+	refreshRate(p)
+	return true
+end
+
+-- Claims prestige points and resets run state.
+function EconomyService.Prestige(player: Player): (boolean, number?, string?)
+	local p = Profiles[player]
+	if not p or shuttingDown then
+		return false, nil, "unavailable"
+	end
+	p.lifetimeCurrency = clampNumber(p.lifetimeCurrency, 0, 0, Config.MaxLifetimeCurrency)
+	p.prestige.points = clampInteger(p.prestige.points, 0, 0, Config.Prestige.maxClaimable)
+	p.prestige.claimedLifetime = clampNumber(p.prestige.claimedLifetime, 0, 0, p.lifetimeCurrency)
+	if p.lifetimeCurrency < Config.Prestige.minCurrency then
+		return false, nil, "below_threshold"
+	end
+	if p.prestige.points >= Config.Prestige.maxClaimable then
+		return false, nil, "maxed"
+	end
+	local claimable = entitledPoints(p.lifetimeCurrency) - entitledPoints(p.prestige.claimedLifetime)
+	claimable = math.min(claimable, Config.Prestige.maxClaimable - p.prestige.points)
+	if claimable < 1 then
+		return false, nil, "no_points"
+	end
+	p.prestige.points = clampInteger(p.prestige.points + claimable, 0, 0, Config.Prestige.maxClaimable)
+	p.prestige.claimedLifetime = clampNumber(math.floor(p.lifetimeCurrency), 0, 0, Config.MaxLifetimeCurrency)
+	p.prestigeMult = prestigeMultiplier(p)
+	p.currency = Config.StartingCurrency
+	for id in Config.Generators do
+		p.generators[id] = 0
+	end
+	for id, def in Config.Upgrades do
+		if type(def) == "table" then
+			p.upgrades[id] = false
+		end
+	end
+	refreshRate(p)
+	return true, claimable
+end
+
+return EconomyService

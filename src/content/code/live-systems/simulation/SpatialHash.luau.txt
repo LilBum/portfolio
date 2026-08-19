@@ -1,0 +1,97 @@
+--!native
+-- Broad-phase uniform grid for fast neighbor queries. No physics, no Instances.
+-- Active cell keys are cleared every frame while bucket tables are recycled through a free list,
+-- so roaming across the world cannot retain every historical cell.
+
+local SpatialHash = {}
+SpatialHash.__index = SpatialHash
+
+local floor = math.floor
+local OFFSET = 32768 -- supports cell coords in [-32768, 32767] with a collision-free numeric key
+
+function SpatialHash.new(cellSize)
+	return setmetatable({
+		cell = cellSize,
+		buckets = {},
+		counts = {},
+		used = {},
+		usedCount = 0,
+		freeBuckets = {},
+		freeCount = 0,
+	}, SpatialHash)
+end
+
+function SpatialHash:clear()
+	local buckets = self.buckets
+	local counts = self.counts
+	local used = self.used
+	local freeBuckets = self.freeBuckets
+	local freeCount = self.freeCount
+	for i = 1, self.usedCount do
+		local k = used[i]
+		local bucket = buckets[k]
+		if bucket then
+			buckets[k] = nil
+			freeCount += 1
+			freeBuckets[freeCount] = bucket
+		end
+		counts[k] = nil
+	end
+	self.usedCount = 0
+	self.freeCount = freeCount
+end
+
+function SpatialHash:insert(id, x, z)
+	local cell = self.cell
+	local buckets = self.buckets
+	local counts = self.counts
+	local k = (floor(x / cell) + OFFSET) * 65536 + (floor(z / cell) + OFFSET)
+	local bucket = buckets[k]
+	if not bucket then
+		local freeCount = self.freeCount
+		if freeCount > 0 then
+			local freeBuckets = self.freeBuckets
+			bucket = freeBuckets[freeCount]
+			freeBuckets[freeCount] = nil
+			self.freeCount = freeCount - 1
+		else
+			bucket = {}
+		end
+		buckets[k] = bucket
+	end
+	local len = counts[k] or 0
+	if len == 0 then
+		local uc = self.usedCount + 1
+		self.usedCount = uc
+		self.used[uc] = k
+	end
+	len += 1
+	counts[k] = len
+	bucket[len] = id
+end
+
+-- Fills `out` with ids in the 3x3 cell neighborhood around (x, z); returns the count.
+function SpatialHash:queryInto(x, z, out)
+	local cell = self.cell
+	local buckets = self.buckets
+	local counts = self.counts
+	local cx = floor(x / cell)
+	local cz = floor(z / cell)
+	local n = 0
+	for dx = -1, 1 do
+		for dz = -1, 1 do
+			local k = (cx + dx + OFFSET) * 65536 + (cz + dz + OFFSET)
+			local m = counts[k]
+			if m and m > 0 then
+				local bucket = buckets[k]
+				for i = 1, m do
+					n += 1
+					out[n] = bucket[i]
+				end
+			end
+		end
+	end
+	return n
+end
+
+return SpatialHash

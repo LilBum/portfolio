@@ -70,7 +70,7 @@ export const projects: Project[] = [
     impact: [
       'Shipped debt-consolidation screens demoed to senior FSA staff and congressional contacts',
       'Built an AWS, Angular, and Node.js calculator that cut a manual workflow by 40%',
-      'Held 98% Jest coverage on owned front-end modules while modernizing legacy Java and Struts flows',
+      'Modernized a 10+ year-old Java/Struts application into Angular and Spring Boot/Hibernate, preserving 10,000+ existing unit tests at 98% Jest coverage on owned modules',
     ],
     tags: ['Angular', 'AWS', 'Node.js', 'Spring Boot', 'Jest'],
     visualLabel: 'Regulated production delivery',
@@ -215,37 +215,44 @@ return RiskDecision(not reasons, tuple(reasons), checked_at)`,
     status: 'Paper Research',
   },
   {
-    title: 'Live-Game Audit & Remediation',
-    category: 'Security consulting',
-    role: 'Roblox audit, estimate, and fix pass',
+    title: 'Live Multiplayer Systems & Security',
+    category: 'Systems engineering',
+    role: 'Persistence, transaction integrity, anti-exploit, and a paid security audit',
     blurb:
-      'A read-only security and systems audit of a live Roblox game, followed by targeted remediation for issues affecting secrets, purchases, rewards, and exploit resistance.',
+      'Server-authoritative systems for live multiplayer games, where every client is hostile by default and a single duplication bug devalues the whole economy. Built on Roblox and Luau, but the problems are the ordinary distributed-systems ones: crash-safe locking, exactly-once writes, and transactions that survive a disconnect mid-commit.',
     impact: [
-      'Audited 296 scripts and identified leaked secrets, unsafe remotes, repeatable rewards, and broken purchase flows',
-      'Delivered a phase-by-phase cleanup estimate instead of one vague project quote',
-      'Shipped initial security and purchase fixes into the live game',
+      'Built lease-based session locking over a distributed key-value store: a lock orphaned by a crashed server self-frees in about three minutes, a live session never goes stale, and a wrongful steal during an outage self-heals on the next write',
+      'Made offline income credit exactly once per load under re-entrancy and clock skew, and defined prestige as the difference of a curve across lifetimes so splitting one claim into many can never mint extra value',
+      'Hardened peer-to-peer trading against currency duplication, arbitrary item-ID injection, and mid-trade disconnects, re-validating both sides at commit rather than trusting the offer',
+      'Replaced per-object physics with flat arrays and a spatial hash, holding 10,000 active entities at 0.78 ms of simulation per tick, roughly 30x the intended load',
+      'Audited 296 scripts of a live game for a client, found leaked secrets, unsafe remotes, and repeatable rewards, then shipped the first remediation pass',
     ],
-    tags: ['Security', 'Audit', 'Static Analysis', 'Technical Writing'],
-    visualLabel: '296-script audit',
+    tags: ['Distributed Locking', 'Transaction Integrity', 'Anti-Exploit', 'Luau', 'Security Audit'],
+    visualLabel: 'Adversarial live systems',
     snippet: {
-      file: 'GrantItem.server.luau',
+      file: 'EconomyService.luau',
       lang: 'luau',
-      code: `-- fixed grant remote from the first pass
-local function onGrant(player, itemId)
-  if not Catalog.Owns(player, itemId) then
-    return Audit.Flag(player, itemId)
+      code: `-- one atomic read-modify-write owns the lock and the balance,
+-- so a crashed server cannot strand a profile forever
+store:UpdateAsync(key, function(stored)
+  local rec = if type(stored) == "table"
+    then stored else defaultProfile()
+
+  if liveForeignLock(rec.lock, sessionId) then
+    blockedByLock = true
+    return nil            -- abort: another server still owns it
   end
-  if RateLimit.Allow(player, 3) then
-    Inventory.Grant(player, itemId)
-  end
-end
-Remotes.GrantItem.OnServerEvent
-  :Connect(onGrant)`,
+
+  rec.lock = { session = sessionId, at = os.time() }
+  return rec
+end)`,
     },
-    uiChip: 'Claim item',
+    uiChip: 'Claim reward',
     caseStudy: '#/case-study/roblox-audit',
+    codeSlug: 'live-systems',
     accent: 'pink',
     year: '2026',
-    status: 'Security Consulting',
+    note: 'Client game stays anonymized; the systems code is my own.',
+    status: 'Live Systems',
   },
 ];
