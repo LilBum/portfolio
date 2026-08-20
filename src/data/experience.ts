@@ -11,9 +11,9 @@ export const experience: Experience[] = [
     role: 'Software Engineer',
     company: 'TSPi',
     location: 'Lynnwood, WA',
-    dates: 'Nov 2023 - Present',
+    dates: 'Nov 2023 - Jul 2026',
     bullets: [
-      'Own the Angular loan workflows used by 1,500+ FSA loan officers and applicants nationwide.',
+      'Owned the Angular loan workflows used by 1,500+ FSA loan officers and applicants nationwide.',
       'Shipped debt-consolidation screens demoed to senior FSA staff and congressional contacts.',
       'Built an AWS, Angular, and Node.js financial calculator that cut a manual workflow by 40%.',
       'Modernized a 10+ year-old Java/Struts application into Angular front ends and Spring Boot/Hibernate services, preserving 10,000+ existing unit tests and holding 98% Jest coverage on the modules I own.',

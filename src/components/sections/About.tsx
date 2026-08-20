@@ -28,16 +28,16 @@ export default function About() {
         <div className="grid gap-10 lg:grid-cols-[1.05fr_1fr] lg:items-start">
           <Reveal className="space-y-5 text-base leading-relaxed text-muted">
             <p>
-              At TSPi I write Angular and AWS software for USDA Farm Service
-              Agency loan programs. The work is financial calculators, legacy
-              migrations, production forms, and federally regulated workflows
-              where a small broken flow can become someone else&apos;s
-              afternoon.
+              For two and a half years at TSPi I wrote Angular and AWS software
+              for USDA Farm Service Agency loan programs: financial
+              calculators, legacy migrations, production forms, and federally
+              regulated workflows where a small broken flow can become someone
+              else&apos;s afternoon.
             </p>
 
             <p>
-              That constraint is what I like about it. Regulated software has
-              to be right the first time, so I spend most of my energy on the
+              That constraint is what I liked about it. Regulated software has
+              to be right the first time, so most of my energy went to the
               parts that decide whether a release holds: validation rules,
               role-dependent states, test coverage, and controlled rollout.
             </p>

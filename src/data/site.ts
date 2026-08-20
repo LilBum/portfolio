@@ -6,7 +6,7 @@ export const site = {
   specialty:
     'Angular and AWS software for federal farm-loan programs, plus deployed client software, computer vision, and risk-first systems',
   tagline:
-    'I write the Angular and AWS software that 1,500 USDA Farm Service Agency staff and applicants use to process federal farm loans. Outside that, I ship client sites, real-time computer vision, and risk-first trading infrastructure.',
+    'I built the Angular and AWS software that 1,500 USDA Farm Service Agency staff and applicants use to process federal farm loans. I also ship client sites, real-time computer vision, and risk-first trading infrastructure.',
   email: 'alexanderursbadet@gmail.com',
   location: 'Lynnwood, WA / Remote',
   resumeUrl: '/Alexander-Urs-Badet-Resume.pdf',

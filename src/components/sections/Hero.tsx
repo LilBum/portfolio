@@ -55,7 +55,7 @@ export default function Hero() {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-2 opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-accent-2" />
             </span>
-            Currently at TSPi · open to new roles
+            Available immediately · Lynnwood, WA / Remote
           </p>
 
           <h1 className="max-w-4xl text-balance font-display text-5xl font-bold leading-[1.04] tracking-tight text-fg sm:text-7xl lg:text-6xl xl:text-7xl">
@@ -123,7 +123,7 @@ export default function Hero() {
                 FSA Debt Consolidation Platform
               </span>
               <span className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-accent-2">
-                2023 - present
+                2023 - 2026
               </span>
             </div>
             <ul className="space-y-3 px-4 py-4">

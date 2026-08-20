@@ -76,7 +76,7 @@ export const projects: Project[] = [
     visualLabel: 'Regulated production delivery',
     note: 'Federal client work; the code is government property and stays private.',
     accent: 'violet',
-    year: '2023-present',
+    year: '2023-2026',
     featured: true,
     status: 'Production',
   },

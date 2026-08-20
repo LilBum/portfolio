@@ -55,7 +55,7 @@ export const projects: Project[] = [
     visualLabel: '1,500+ daily users',
     note: 'Federal client work - details kept private, including the code',
     accent: 'violet',
-    year: '2023-present',
+    year: '2023-2026',
     featured: true,
   },
   {
