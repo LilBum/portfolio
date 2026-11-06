@@ -2,10 +2,11 @@ import { useEffect, useId, useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent } from 'react'
 import { measureRoute } from './measureRoute'
 import { buildRoverRoute } from './roverRoute'
+import TraveledRoute, { type TrailPainter } from './TraveledRoute'
 import './ScrollIndicator.css'
 
-function getScene(main: HTMLElement) {
-  const layout = measureRoute(main)
+function getScene(main: HTMLElement, roverWidth: number) {
+  const layout = measureRoute(main, roverWidth)
   return layout && { ...layout, route: buildRoverRoute(layout) }
 }
 type Scene = NonNullable<ReturnType<typeof getScene>>
@@ -33,12 +34,14 @@ export default function ScrollIndicator() {
   const sheet = useRef<HTMLDivElement>(null)
   const handle = useRef<HTMLButtonElement>(null)
   const vehicle = useRef<SVGSVGElement>(null)
+  const trail = useRef<TrailPainter | null>(null)
   const [scene, setScene] = useState<Scene | null>(null)
   const drag = useRef<{ id: number; y: number; scroll: number } | null>(null)
 
   useEffect(() => {
     const main = sheet.current?.parentElement
-    if (!main) return
+    const rover = handle.current
+    if (!main || !rover) return
     let active: Scene | null = null
     let lastY = window.scrollY
     let reversed = false
@@ -51,6 +54,7 @@ export default function ScrollIndicator() {
       if (Math.abs(y - lastY) > 1) reversed = y < lastY
       lastY = y
       const point = active.route.sample(y)
+      if (trail.current?.route === active.route) trail.current.draw(point)
       handle.current.style.transform = 'translate3d(' + point.x.toFixed(2) + 'px,' + point.y.toFixed(2) + 'px,0) translate(-50%,-50%)'
       vehicle.current.style.transform = 'rotate(' + (point.angle + (reversed ? 180 : 0)).toFixed(1) + 'deg)'
       const percent = Math.round(100 * y / Math.max(1, active.maxScroll))
@@ -58,7 +62,7 @@ export default function ScrollIndicator() {
     }
     const measure = () => {
       measureFrame = 0
-      active = getScene(main)
+      active = getScene(main, rover.getBoundingClientRect().width)
       setScene(active)
       draw()
     }
@@ -72,6 +76,7 @@ export default function ScrollIndicator() {
     // The decorative route can wait until the main page has rendered.
     const observer = new ResizeObserver(requestMeasure)
     observer.observe(main)
+    observer.observe(rover)
     // An expanded project or a font swap can move the next crossing even if
     // the viewport keeps the same dimensions.
     main.querySelectorAll('section, .hero-intro, #tracking-demo, .project-feature, .project-catalog, .experience-intro, .about-layout, .skills-layout').forEach(el => observer.observe(el))
@@ -107,17 +112,18 @@ export default function ScrollIndicator() {
   const end = scene?.route.sample(scene.maxScroll)
   return (
     <div className="page-route" ref={sheet}>
-      {scene && start && end && (
-        <svg className="page-route__map" aria-hidden="true" focusable="false">
+      <TraveledRoute route={scene?.route} ink={id + '-ink'} ref={trail} />
+      <svg className="page-route__map" aria-hidden="true" focusable="false">
+        {scene && start && end && <>
           <defs>
             <linearGradient id={id + '-ink'} gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="0" y2={scene.height}>
-              <stop stopColor="#7686ae" />
-              <stop offset={scene.darkStart} stopColor="#7686ae" />
-              <stop offset={scene.darkStart} stopColor="#a4ade3" />
-              <stop offset={scene.darkEnd} stopColor="#a4ade3" />
-              <stop offset={scene.darkEnd} stopColor="#7686ae" />
-              <stop offset={scene.contactStart} stopColor="#7686ae" />
-              <stop offset={scene.contactStart} stopColor="#ddd9ff" />
+              <stop stopColor="#3554d5" />
+              <stop offset={scene.darkStart} stopColor="#3554d5" />
+              <stop offset={scene.darkStart} stopColor="#b5c5ff" />
+              <stop offset={scene.darkEnd} stopColor="#b5c5ff" />
+              <stop offset={scene.darkEnd} stopColor="#3554d5" />
+              <stop offset={scene.contactStart} stopColor="#3554d5" />
+              <stop offset={scene.contactStart} stopColor="#ffdc9b" />
             </linearGradient>
             <path id={id + '-road'} d={scene.route.path} />
           </defs>
@@ -132,8 +138,8 @@ export default function ScrollIndicator() {
               <circle r="6" /><circle r="2" />
             </g>
           ))}
-        </svg>
-      )}
+        </>}
+      </svg>
       <button ref={handle} className="page-route__rover" style={{ visibility: scene ? undefined : 'hidden' }}
         type="button" role="slider" aria-label="Page scroll position" aria-orientation="vertical"
         aria-valuemin={0} aria-valuemax={100} aria-valuenow={0}

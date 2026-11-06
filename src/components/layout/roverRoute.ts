@@ -13,9 +13,17 @@ export type RoverRouteInput = {
 }
 
 export type RoverRoutePoint = { x: number; y: number; angle: number; distance: number }
+export type RoverRoutePiece = {
+  path: string
+  bounds: { left: number; top: number; right: number; bottom: number }
+  startDistance: number
+  endDistance: number
+  direction: 'down' | 'right' | 'left'
+}
 export type RoverRoute = {
   path: string
   length: number
+  pieces: RoverRoutePiece[]
   sample: (scrollY: number) => RoverRoutePoint
   nearestScroll: (x: number, y: number) => number
 }
@@ -110,7 +118,7 @@ export function buildRoverRoute(input: RoverRouteInput): RoverRoute {
   const startX = clamp(input.startX ?? inset, 0, width)
   const start = { x: startX, y: startY, angle: 90, distance: 0 }
   const move = `M${startX},${startY}`
-  if (endY === startY) return { path: move, length: 0, sample: () => ({ ...start }), nearestScroll: () => 0 }
+  if (endY === startY) return { path: move, length: 0, pieces: [], sample: () => ({ ...start }), nearestScroll: () => 0 }
 
   const baseline = (y: number) => (y - startY) / (endY - startY) * maxScroll
   const screenStart = mainTop + startY
@@ -179,13 +187,31 @@ export function buildRoverRoute(input: RoverRouteInput): RoverRoute {
   addLane(endY, maxScroll)
 
   const samples: Sample[] = [{ ...start, scroll: 0 }]
+  const pieces: RoverRoutePiece[] = []
   const commands = [move]
   let corner = 0
   for (const portion of portions) {
     const from = samples.length - 1
+    const commandStart = commands.length
+    const first = portion.curves[0][0]
+    const end = portion.curves[portion.curves.length - 1][3]
+    const dx = end.x - first.x
+    const sign = Math.sign(dx)
+    let horizontal = Math.abs(dx) > end.y - first.y
+    const bounds = { left: first.x - 3, top: first.y - 3, right: first.x + 3, bottom: first.y + 3 }
     for (const curve of portion.curves) {
       const [a, b, c, d] = curve
       commands.push(`C${b.x},${b.y} ${c.x},${c.y} ${d.x},${d.y}`)
+      // A cubic stays inside its control hull. Ordered controls also guarantee
+      // that revealing by x never uncovers a later part of the same curve.
+      for (let j = 1; j < curve.length; j++) {
+        const p = curve[j]
+        bounds.left = Math.min(bounds.left, p.x - 3)
+        bounds.top = Math.min(bounds.top, p.y - 3)
+        bounds.right = Math.max(bounds.right, p.x + 3)
+        bounds.bottom = Math.max(bounds.bottom, p.y + 3)
+        if ((p.x - curve[j - 1].x) * sign < 0) horizontal = false
+      }
       const count = clamp(Math.ceil((gap(a, b) + gap(b, c) + gap(c, d)) / 10), 12, 180)
       for (let i = 1; i <= count; i++) {
         const current = sampleCurve(curve, i / count)
@@ -203,7 +229,13 @@ export function buildRoverRoute(input: RoverRouteInput): RoverRoute {
       }
     }
     const startDistance = samples[from].distance
-    const length = samples[samples.length - 1].distance - startDistance
+    const endDistance = samples[samples.length - 1].distance
+    const length = endDistance - startDistance
+    pieces.push({
+      path: `M${first.x},${first.y} ${commands.slice(commandStart).join(' ')}`,
+      bounds, startDistance, endDistance,
+      direction: horizontal ? (dx > 0 ? 'right' : 'left') : 'down',
+    })
     for (let i = from + 1; i < samples.length; i++) {
       const s = samples[i]
       const fraction = (s.distance - startDistance) / length
@@ -252,5 +284,5 @@ export function buildRoverRoute(input: RoverRouteInput): RoverRoute {
     return result
   }
 
-  return { path: commands.join(' '), length: last.distance, sample, nearestScroll }
+  return { path: commands.join(' '), length: last.distance, pieces, sample, nearestScroll }
 }

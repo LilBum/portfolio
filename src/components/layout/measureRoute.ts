@@ -2,7 +2,7 @@ import type { RoverRouteInput } from './roverRoute'
 
 // Crossovers go in measured whitespace. The vertical legs can use a real
 // column gap on wide screens or the page gutter when the columns stack.
-export function measureRoute(main: HTMLElement) {
+export function measureRoute(main: HTMLElement, roverWidth: number) {
   const frame = main.getBoundingClientRect()
   const landmarks = {
     hero: '.hero-intro',
@@ -44,14 +44,13 @@ export function measureRoute(main: HTMLElement) {
   const left = inset
   const right = frame.width - inset
   const bands: RoverRouteInput['bands'] = []
-  const roverWidth = frame.width <= 672 ? 16 : Math.min(30, frame.width * .019)
   // Let a generous margin meander. In tight grid gaps keep the path centered.
   const outerDrift = Math.max(0, Math.min(30, inset - roverWidth / 2 - 3, hero.left - inset - roverWidth / 2 - 3))
   const gapDrift = (space: number) => Math.max(0, Math.min(18, (space - roverWidth) / 2 - 4))
   function cross(top: number, bottom: number, nextX: number, nextDrift = outerDrift) {
     // Leave room at both ends for the rover's body and the section content.
     if (bottom - top >= 24) {
-      const pad = Math.min(roverWidth / 2 + 2, (bottom - top) * .26)
+      const pad = Math.min(roverWidth / 2 + 2, (bottom - top) * .41)
       bands.push({ top: top + pad, bottom: bottom - pad, nextX, nextDrift })
     }
   }

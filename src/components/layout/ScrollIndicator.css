@@ -1,16 +1,27 @@
-.route-main { position: relative; isolation: isolate; }
+.route-main { position: relative; isolation: isolate; --page-rover-size: clamp(24px, 2.65vw, 42px); }
 .page-route {
   position: absolute; inset: 0; z-index: 2; overflow: clip; pointer-events: none;
 }
 .page-route__map { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .page-route__track {
-  fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-dasharray: 3 7; opacity: .73;
+  fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-dasharray: 3 7; opacity: .48;
 }
+.page-route__traveled { fill: none; stroke-width: 3.5; stroke-linecap: round; pointer-events: none; }
+.page-route__ink { position: absolute; inset: 0; pointer-events: none; }
+.page-route__piece {
+  position: absolute; overflow: hidden; contain: strict; visibility: hidden;
+}
+.page-route__piece:is([data-state="current"], [data-state="done"]) { visibility: visible; }
+.page-route__clip, .page-route__clip svg {
+  width: 100%; height: 100%; display: block; overflow: hidden;
+}
+.page-route__piece[data-state="current"] .page-route__clip,
+.page-route__piece[data-state="current"] .page-route__clip svg { will-change: transform; }
 .page-route__hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer; }
 .page-route__dock circle:first-child { fill: #faf8f1; stroke: #7180ad; stroke-width: 1.4; }
 .page-route__dock circle:last-child { fill: #e99453; }
 .page-route__rover {
-  position: absolute; top: 0; left: 0; width: clamp(16px, 1.9vw, 30px); height: clamp(16px, 1.9vw, 30px); padding: 0;
+  position: absolute; top: 0; left: 0; width: var(--page-rover-size); height: var(--page-rover-size); padding: 0;
   display: grid; place-items: center; border: 0; border-radius: 50%;
   cursor: ns-resize; pointer-events: auto; touch-action: pan-y; user-select: none;
   will-change: transform;
@@ -18,8 +29,8 @@
 .page-route__rover svg { width: 100%; height: auto; overflow: visible; }
 .page-route__rover:focus-visible { outline: 2px solid #de8844; outline-offset: 1px; background: #faf8f1; }
 @media (max-width: 42rem) {
-  .page-route__rover { width: 16px; height: 16px; }
   .page-route__track { stroke-width: 1.25; stroke-dasharray: 2 6; }
+  .page-route__traveled { stroke-width: 2.75; }
   .page-route__hit { pointer-events: none; }
 }
 @media (pointer: coarse) {
