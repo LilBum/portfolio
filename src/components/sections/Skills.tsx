@@ -1,40 +1,38 @@
-import SectionHeading from '../ui/SectionHeading';
-import Reveal from '../ui/Reveal';
-import { skillGroups } from '../../data/skills';
+import { languages, projectLanguages, researchSkills, skillGroups } from '../../data/skills'
+import './background.css'
 
 export default function Skills() {
   return (
-    <section id="skills" className="scroll-mt-24 bg-surface/35 px-6 py-24">
-      <div className="mx-auto max-w-6xl">
-        <SectionHeading
-          eyebrow="Skills"
-          title="The stack, end to end"
-          description="Production full-stack work with Angular, AWS, Node, and testing, backed by hands-on systems work in Python, computer vision, robotics, and application security."
-        />
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {skillGroups.map((group, i) => (
-            <Reveal
-              key={group.label}
-              delay={i * 0.06}
-              className="rounded-2xl border border-border bg-bg/55 p-5 transition-colors hover:border-accent-2/40"
-            >
-              <h3 className="mb-4 font-mono text-xs font-semibold uppercase tracking-eyebrow text-accent-2">
-                {group.label}
-              </h3>
-              <ul className="flex flex-wrap gap-2">
-                {group.items.map((item) => (
-                  <li
-                    key={item}
-                    className="rounded-full border border-transparent bg-surface px-3 py-1.5 text-sm text-muted transition-colors hover:border-accent-2/30 hover:text-fg"
-                  >
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </Reveal>
-          ))}
+    <section id="skills" aria-labelledby="skills-title" className="folio-background skills-background">
+      <div className="folio-width">
+        <div className="skills-layout">
+          <h2 id="skills-title" className="background-heading">Technical skills</h2>
+          <div>
+            <dl className="skills-languages">
+              <dt>Programming languages</dt>
+              <dd>{languages.join(', ')}</dd>
+              <dt>Also used in projects</dt>
+              <dd className="skills-project-languages">{projectLanguages.join(' · ')}</dd>
+            </dl>
+            <dl className="skills-research">
+              {researchSkills.map((group) => (
+                <div key={group.label}>
+                  <dt>{group.label}</dt>
+                  <dd>{group.description}{group.note && <p>{group.note}</p>}</dd>
+                </div>
+              ))}
+            </dl>
+            <dl className="tools-list">
+              {skillGroups.map((group) => (
+                <div key={group.label}>
+                  <dt>{group.label}</dt>
+                  <dd>{group.items.join(', ')}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
         </div>
       </div>
     </section>
-  );
+  )
 }

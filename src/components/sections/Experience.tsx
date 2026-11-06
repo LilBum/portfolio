@@ -1,70 +1,92 @@
-import { CheckCircle2 } from 'lucide-react';
-import { experience } from '../../data/experience';
-import Reveal from '../ui/Reveal';
-import SectionHeading from '../ui/SectionHeading';
+import { experience } from '../../data/experience'
+import { ArrowUpRight } from 'lucide-react'
+import './background.css'
+
+function monthIndex(month: string) {
+  const [year, monthOfYear] = month.split('-').map(Number)
+  return year * 12 + monthOfYear - 1
+}
+
+function CareerTimeline() {
+  const now = new Date()
+  const currentMonth = now.getFullYear() * 12 + now.getMonth()
+  const periods = experience.flatMap((job) => job.periods)
+  const firstYear = Math.floor(Math.min(...periods.map((period) => monthIndex(period.start))) / 12)
+  const lastMonth = Math.max(...periods.map((period) => period.end ? monthIndex(period.end) : currentMonth))
+  const years = Array.from({ length: Math.floor(lastMonth / 12) - firstYear + 1 }, (_, i) => firstYear + i)
+  const monthsInView = years.length * 12
+
+  return (
+    <nav className="career-map" aria-label="Jump to an experience by employer">
+      <div className="career-axis" aria-hidden="true">
+        {years.map((year) => <span key={year}>{year}</span>)}
+      </div>
+      <div className="career-rows">
+        {experience.map((job) => (
+          <a key={job.id} className="career-link" href={'#role-' + job.id}
+            aria-label={job.company + ', ' + job.dates}>
+            <span className="career-name">{job.shortCompany ?? job.company}</span>
+            <span className="career-track" aria-hidden="true" style={{ backgroundSize: (100 / years.length) + '% 100%' }}>
+              {job.periods.map((period) => {
+                const start = monthIndex(period.start)
+                const end = period.end ? monthIndex(period.end) : Math.max(start, currentMonth)
+                return (
+                  <span key={period.start} className={'career-segment' + (period.end ? '' : ' career-ongoing')}
+                    style={{
+                      left: ((start - firstYear * 12) / monthsInView * 100) + '%',
+                      width: ((end - start + 1) / monthsInView * 100) + '%',
+                    }}
+                  />
+                )
+              })}
+            </span>
+          </a>
+        ))}
+      </div>
+    </nav>
+  )
+}
 
 export default function Experience() {
   return (
-    <section id="experience" className="scroll-mt-24 bg-surface/35 px-6 py-24">
-      <div className="mx-auto max-w-6xl">
-        <SectionHeading
-          eyebrow="Experience"
-          title="Production experience with measurable impact"
-          description="Professional software work across regulated systems, customer-facing tools, legacy modernization, testing, and delivery for real users."
-        />
-        <div className="relative">
-          <span
-            aria-hidden
-            className="absolute bottom-6 left-[7.5px] top-3 w-px bg-gradient-to-b from-accent-2/60 via-border to-transparent"
-          />
-
-          <div className="grid gap-8">
-            {experience.map((job, i) => (
-              <Reveal
-                key={`${job.company}-${job.role}`}
-                delay={i * 0.08}
-                className="relative pl-10 sm:pl-14"
-              >
-                <span
-                  aria-hidden
-                  className="absolute left-0 top-7 flex h-4 w-4 items-center justify-center rounded-full border border-accent-2/50 bg-bg"
-                >
-                  <span className="h-1.5 w-1.5 rounded-full bg-accent-2" />
-                </span>
-
-                <article className="rounded-2xl border border-border bg-bg/55 p-6 transition-colors hover:border-accent-2/40 sm:p-7">
-                  <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-                    <div>
-                      <p className="font-mono text-xs font-semibold uppercase tracking-eyebrow text-accent-2">
-                        {job.company}
-                      </p>
-                      <h3 className="mt-1.5 font-display text-xl font-bold tracking-tight">
-                        {job.role}
-                      </h3>
-                      <p className="mt-1 text-sm text-muted">{job.location}</p>
-                    </div>
-                    <p className="shrink-0 self-start rounded-full border border-border bg-surface px-4 py-2 font-mono text-xs text-muted">
-                      {job.dates}
-                    </p>
-                  </div>
-
-                  <ul className="mt-6 grid gap-3 md:grid-cols-2">
-                    {job.bullets.map((bullet) => (
-                      <li
-                        key={bullet}
-                        className="flex gap-3 text-sm leading-relaxed text-muted"
-                      >
-                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-accent-2" />
-                        <span>{bullet}</span>
-                      </li>
+    <section id="experience" aria-labelledby="experience-title" className="folio-background exp-background">
+      <div className="folio-width">
+        <div className="experience-intro">
+          <h2 id="experience-title" className="background-heading">Experience</h2>
+          <CareerTimeline />
+        </div>
+        <div className="history-list">
+          {experience.map((job) => (
+            <article key={job.id} id={'role-' + job.id} className="history-entry" tabIndex={-1}>
+              <header className="history-heading">
+                <p className="history-date">{job.dates}</p>
+                <h3>{job.company}</h3>
+                <p className="history-role">{job.role}</p>
+                <p className="history-place">{job.location}</p>
+              </header>
+              <div className="history-body">
+                {job.bullets.map((bullet) => <p key={bullet}>{bullet}</p>)}
+                {job.demo && (
+                  <a className="history-demo" href={job.demo.href}>
+                    {job.demo.label} <ArrowUpRight aria-hidden="true" size={16} />
+                  </a>
+                )}
+                {job.impact && (
+                  <dl className="history-impact">
+                    {job.impact.map((stat) => (
+                      <div key={stat.label}>
+                        <dt>{stat.value}</dt>
+                        <dd>{stat.label}<small>{stat.detail}</small></dd>
+                      </div>
                     ))}
-                  </ul>
-                </article>
-              </Reveal>
-            ))}
-          </div>
+                  </dl>
+                )}
+                {job.footnote && <p className="history-footnote">{job.footnote}</p>}
+              </div>
+            </article>
+          ))}
         </div>
       </div>
     </section>
-  );
+  )
 }

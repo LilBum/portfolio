@@ -33,3 +33,14 @@ weppy-project-sync/
 .env
 .env.*
 !.env.example
+
+.vercel
+
+# Private working files, including retired portfolio samples
+/.private/
+/.codex-remote-attachments/
+/output/
+/outputs/
+/tmp/
+/scripts/
+/sites/

@@ -1,0 +1,114 @@
+.audit-page {
+  min-height: 100svh;
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.audit-nav, .audit-main {
+  margin-inline: auto;
+  width: min(calc(100% - 3rem), 60rem);
+}
+
+.audit-nav, .audit-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: .4rem 1.25rem;
+  border-block-end: 1px solid var(--color-border);
+  padding-block: .85rem;
+}
+
+.audit-nav a, .audit-footer a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  gap: .45rem;
+  color: var(--color-accent);
+  font-size: .9rem;
+  font-weight: 550;
+  text-underline-offset: .22em;
+}
+
+.audit-nav a:hover, .audit-footer a:hover {
+  color: #7d301c;
+  text-decoration: underline;
+}
+
+.audit-nav a:first-child {
+  color: var(--color-fg);
+  font-weight: 650;
+}
+
+.audit-intro {
+  padding-block: clamp(3.25rem, 8vw, 6.5rem) clamp(2.25rem, 5vw, 4.25rem);
+}
+
+.audit-label {
+  color: var(--color-muted);
+  font-family: var(--font-mono, monospace);
+  font-size: .75rem;
+  letter-spacing: .05em;
+}
+
+.audit-intro h1, .audit-section h2 {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.audit-intro h1 {
+  max-width: 13em;
+  margin: .7rem 0 1.25rem;
+  font-size: clamp(2.9rem, 6.3vw, 5.75rem);
+  line-height: 1;
+  letter-spacing: -.075em;
+  text-wrap: balance;
+}
+
+.audit-intro h1:focus {
+  outline: none;
+}
+
+.audit-lead {
+  max-width: 44rem;
+  color: var(--color-muted);
+  font-size: clamp(1.1rem, 2vw, 1.35rem);
+  line-height: 1.6;
+}
+
+.audit-section {
+  display: grid;
+  grid-template-columns: minmax(9rem, .75fr) minmax(0, 1.8fr);
+  gap: clamp(1.25rem, 4vw, 3rem);
+  border-block-start: 1px solid var(--color-border);
+  padding-block: clamp(1.6rem, 3.75vw, 2.75rem);
+}
+
+.audit-section h2 {
+  font-size: clamp(1.65rem, 2.7vw, 2.2rem);
+  line-height: 1.16;
+  letter-spacing: -.035em;
+}
+
+.audit-section p {
+  max-width: 62ch;
+  line-height: 1.7;
+  font-size: 1rem;
+}
+
+.audit-section p + p {
+  margin-block-start: .8rem;
+}
+
+.audit-footer {
+  border-block-start: 1px solid var(--color-border);
+  border-block-end: none;
+  margin-block-end: 1.4rem;
+}
+
+@media (max-width: 42rem) {
+  .audit-section {
+    grid-template-columns: 1fr;
+    gap: .75rem;
+  }
+}

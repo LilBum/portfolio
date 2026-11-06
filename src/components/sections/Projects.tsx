@@ -1,40 +1,17 @@
-import SectionHeading from '../ui/SectionHeading'
-import Reveal from '../ui/Reveal'
 import ProjectCard from '../ui/ProjectCard'
 import { projects } from '../../data/projects'
+import './project-list.css'
 
 export default function Projects() {
-  const featured = projects.filter((p) => p.featured)
-  const rest = projects.filter((p) => !p.featured)
-
   return (
-    <section id="projects" className="scroll-mt-24 px-6 py-24">
-      <div className="mx-auto max-w-6xl">
-        <SectionHeading
-          eyebrow="Projects"
-          title="Projects that left receipts"
-          description="Production work first, then the independent systems. Where the code is private, the architecture and the reasoning are not."
-        />
-
-        {featured.map((project) => (
-          <Reveal key={project.title} className="mb-6 min-w-0">
-            <ProjectCard project={project} />
-          </Reveal>
-        ))}
-
-        <div className="grid gap-6 lg:grid-cols-2">
-          {rest.map((project, i) => {
-            const lastProject = i === rest.length - 1
-            return (
-              <Reveal
-                key={project.title}
-                delay={i * 0.06}
-                className={lastProject ? 'h-full min-w-0 lg:col-span-2' : 'h-full min-w-0'}
-              >
-                <ProjectCard project={project} wide={lastProject} />
-              </Reveal>
-            )
-          })}
+    <section id="projects" aria-labelledby="projects-heading" className="project-index">
+      <div className="folio-width">
+        <h2 id="projects-heading">Selected work<span aria-hidden>.</span></h2>
+        <div className="project-features">
+          {projects.slice(0, 2).map((project) => <ProjectCard key={project.id} project={project} featured />)}
+        </div>
+        <div className="project-catalog">
+          {projects.slice(2).map((project) => <ProjectCard key={project.id} project={project} />)}
         </div>
       </div>
     </section>
