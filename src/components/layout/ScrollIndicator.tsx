@@ -43,7 +43,7 @@ export default function ScrollIndicator() {
     const rover = handle.current
     if (!main || !rover) return
     let active: Scene | null = null
-    let lastY = window.scrollY
+    let directionExtreme = window.scrollY
     let reversed = false
     let drawFrame = 0
     let measureFrame = 0
@@ -51,18 +51,25 @@ export default function ScrollIndicator() {
       drawFrame = 0
       if (!active || !handle.current || !vehicle.current) return
       const y = window.scrollY
-      if (Math.abs(y - lastY) > 1) reversed = y < lastY
-      lastY = y
+      // Count small wheel steps toward a reversal, but ignore scroll jitter.
+      directionExtreme = reversed ? Math.min(directionExtreme, y) : Math.max(directionExtreme, y)
+      if (Math.abs(y - directionExtreme) >= 4) {
+        reversed = !reversed
+        directionExtreme = y
+        handle.current.toggleAttribute('data-reversing', reversed)
+      }
       const point = active.route.sample(y)
       if (trail.current?.route === active.route) trail.current.draw(point)
       handle.current.style.transform = 'translate3d(' + point.x.toFixed(2) + 'px,' + point.y.toFixed(2) + 'px,0) translate(-50%,-50%)'
-      vehicle.current.style.transform = 'rotate(' + (point.angle + (reversed ? 180 : 0)).toFixed(1) + 'deg)'
+      // Follow the tangent immediately; CSS eases the independent half-turn.
+      vehicle.current.style.rotate = point.angle.toFixed(1) + 'deg'
       const percent = Math.round(100 * y / Math.max(1, active.maxScroll))
       handle.current.setAttribute('aria-valuenow', String(Math.min(100, Math.max(0, percent))))
     }
     const measure = () => {
       measureFrame = 0
       active = getScene(main, rover.getBoundingClientRect().width)
+      directionExtreme = window.scrollY
       setScene(active)
       draw()
     }
@@ -84,6 +91,7 @@ export default function ScrollIndicator() {
     window.addEventListener('scroll', requestDraw, { passive: true })
     return () => {
       observer.disconnect()
+      rover.removeAttribute('data-reversing')
       cancelAnimationFrame(measureFrame)
       cancelAnimationFrame(drawFrame)
       window.removeEventListener('resize', requestMeasure)
@@ -153,6 +161,7 @@ export default function ScrollIndicator() {
             <path d="M9 6h11l4 2.5v6L20 17H9Z" fill="#3653e5"/>
             <path d="M7 8v7m19-6.5v6" fill="none"/>
             <path d="M29 10h3v3h-3" fill="#f4b353"/><circle cx="18" cy="11.5" r="3" fill="#f4b353"/>
+            <circle cx="18" cy="11.5" r="1.25" fill="#fff6cd" stroke="none"/>
           </g>
         </svg>
       </button>
