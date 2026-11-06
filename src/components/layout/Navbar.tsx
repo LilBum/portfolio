@@ -1,14 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowUpRight, Menu, X } from 'lucide-react'
 import { navLinks, site } from '../../data/site'
-import ScrollIndicator from './ScrollIndicator'
 
 export default function Navbar() {
   const [open, setOpen] = useState(false)
   const [activeSection, setActiveSection] = useState('')
   const menuButton = useRef<HTMLButtonElement>(null)
-  const progressTrack = useRef<HTMLDivElement>(null)
-  const scrollControl = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const sections = navLinks.map(({ href }) => document.getElementById(href.slice(1)))
@@ -23,13 +20,6 @@ export default function Navbar() {
       if (href !== currentHref) {
         currentHref = href
         setActiveSection(href)
-      }
-      const progress = maxScroll > 0 ? Math.max(0, Math.min(1, window.scrollY / maxScroll)) : 0
-      progressTrack.current?.style.setProperty('--read-ratio', String(progress))
-      progressTrack.current?.style.setProperty('--read-position', `${progress * 100}%`)
-      if (scrollControl.current) {
-        scrollControl.current.value = String(progress * 100)
-        scrollControl.current.setAttribute('aria-valuetext', `${Math.round(progress * 100)}% of page`)
       }
     }
     updateSection()
@@ -83,7 +73,6 @@ export default function Navbar() {
           <li className="nav-resume"><a href={site.resumeUrl} target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>Résumé <ArrowUpRight size={15} aria-hidden="true" /></a></li>
         </ul>
       </nav>
-      <ScrollIndicator trackRef={progressTrack} controlRef={scrollControl} />
     </header>
   )
 }

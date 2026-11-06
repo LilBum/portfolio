@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import Navbar from './components/layout/Navbar'
 import Footer from './components/layout/Footer'
+import ScrollIndicator from './components/layout/ScrollIndicator'
 import Hero from './components/sections/Hero'
 import About from './components/sections/About'
 import Experience from './components/sections/Experience'
@@ -33,7 +34,8 @@ export default function App() {
     <div id="top">
       <a href="#main" className="skip-link">Skip to content</a>
       <Navbar />
-      <main id="main">
+      <main id="main" className="route-main">
+        <ScrollIndicator />
         <Hero />
         <Projects />
         <Experience />

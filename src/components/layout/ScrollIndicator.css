@@ -1,120 +1,35 @@
-.scroll-indicator {
-  --read-ratio: 0;
-  --read-position: 0%;
-  --trail: #3653e5;
-  position: relative;
-  height: 15px;
-  overflow: clip;
-  pointer-events: none;
+.route-main { position: relative; isolation: isolate; }
+.page-route {
+  position: absolute; inset: 0; z-index: 2; overflow: clip; pointer-events: none;
 }
-
-.scroll-indicator__path {
-  position: absolute;
-  inset: 0 13px;
+.page-route__map { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.page-route__track {
+  fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-dasharray: 3 7; opacity: .73;
 }
-
-.scroll-indicator__path::before,
-.scroll-indicator__trail {
-  position: absolute;
-  inset: 50% 0 auto;
-  height: 2px;
-  margin-top: -1px;
+.page-route__hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer; }
+.page-route__dock circle:first-child { fill: #faf8f1; stroke: #7180ad; stroke-width: 1.4; }
+.page-route__dock circle:last-child { fill: #e99453; }
+.page-route__rover {
+  position: absolute; top: 0; left: 0; width: clamp(16px, 1.9vw, 30px); height: clamp(16px, 1.9vw, 30px); padding: 0;
+  display: grid; place-items: center; border: 0; border-radius: 50%;
+  cursor: ns-resize; pointer-events: auto; touch-action: pan-y; user-select: none;
+  will-change: transform;
 }
-
-.scroll-indicator__path::before {
-  content: '';
-  background: repeating-linear-gradient(to right, #a6acbd 0 3px, transparent 3px 7px);
+.page-route__rover svg { width: 100%; height: auto; overflow: visible; }
+.page-route__rover:focus-visible { outline: 2px solid #de8844; outline-offset: 1px; background: #faf8f1; }
+@media (max-width: 42rem) {
+  .page-route__rover { width: 16px; height: 16px; }
+  .page-route__track { stroke-width: 1.25; stroke-dasharray: 2 6; }
+  .page-route__hit { pointer-events: none; }
 }
-
-.scroll-indicator__trail {
-  background: var(--trail);
-  transform: scaleX(var(--read-ratio));
-  transform-origin: left center;
+@media (pointer: coarse) {
+  .page-route__hit, .page-route__rover { pointer-events: none; }
 }
-
-.scroll-indicator__carrier {
-  position: absolute;
-  inset: 0;
-  transform: translateX(var(--read-position));
-}
-
-.scroll-indicator__rover {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  width: 23px;
-  height: 15px;
-  transform: translate(-50%, -50%);
-}
-
-.scroll-indicator__control { display: none; }
-
-@media (min-width: 64rem) {
-  .scroll-indicator {
-    position: fixed;
-    right: clamp(2px, .4vw, 10px);
-    top: max(6rem, 10vh);
-    bottom: max(2.5rem, 9vh);
-    width: 40px;
-    height: auto;
-  }
-
-  .scroll-indicator__path {
-    inset: 16px 0;
-    width: 100%;
-  }
-
-  .scroll-indicator__path::before, .scroll-indicator__trail {
-    inset: 0 auto 0 50%;
-    width: 2px;
-    height: 100%;
-    margin: 0 0 0 -1px;
-  }
-
-  .scroll-indicator__path::before {
-    width: 10px;
-    margin-left: -5px;
-    border-inline: 2px solid #faf8f1;
-    background: repeating-linear-gradient(to bottom, #9b9fb0 0 2px, #faf8f1 2px 7px);
-  }
-
-  .scroll-indicator__trail {
-    transform: scaleY(var(--read-ratio));
-    transform-origin: center top;
-  }
-
-  .scroll-indicator__carrier { transform: translateY(var(--read-position)); }
-
-  .scroll-indicator__rover {
-    left: 50%;
-    top: 0;
-    width: 32px;
-    height: 22px;
-    transform: translate(-50%, -50%) rotate(90deg);
-  }
-
-  .scroll-indicator__control {
-    position: absolute;
-    inset: 0;
-    display: block;
-    width: 100%;
-    height: 100%;
-    opacity: 0;
-    margin: 0;
-    pointer-events: auto;
-    cursor: ns-resize;
-    writing-mode: vertical-lr;
-    direction: ltr;
-    touch-action: none;
-  }
-
-  .scroll-indicator:has(.scroll-indicator__control:focus-visible) {
-    outline: 2px solid var(--trail);
-    outline-offset: -2px;
-    border-radius: 4px;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .scroll-indicator__carrier { display: none; }
+  .page-route__rover { opacity: 0; pointer-events: none; }
+  .page-route__rover:focus-visible {
+    opacity: 1; position: fixed; top: auto; left: .65rem; bottom: .65rem;
+    transform: none !important;
+  }
+  .page-route__rover svg { transform: none !important; }
 }
